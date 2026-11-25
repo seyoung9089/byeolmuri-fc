@@ -48,6 +48,15 @@ h2{font-size:17px;margin:0;font-weight:700}
 .topnav button[aria-current="page"]{color:var(--fg);border-bottom-color:var(--fg);font-weight:700}
 .coins{margin-left:auto;align-self:center;font-family:var(--mono);font-size:13px;color:var(--gold)}
 
+.formpick{display:flex;flex-direction:column;gap:8px}
+.fchips{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.fchip{display:flex;flex-direction:column;gap:2px;align-items:flex-start;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px;text-align:left}
+.fchip b{font-family:var(--mono);font-size:15px}
+.fchip small{font-size:11px;color:var(--muted)}
+.fchip[aria-pressed="true"]{border-color:var(--fg);box-shadow:inset 0 0 0 1px var(--fg)}
+.fchip:disabled{opacity:.5;cursor:not-allowed}
+@media (max-width:480px){.fchips{grid-template-columns:repeat(2,1fr)}}
+
 /* match */
 .board{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px}
 .board .t{font-size:13px;color:var(--muted);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -249,8 +258,40 @@ body.fitbody{padding-block:10px}
 'use strict';
 // ---------- data ----------
 const POS = ['GK','LB','LCB','RCB','RB','CDM','LCM','RCM','LW','ST','RW'];
-const ROLE = {GK:'GK',LB:'FB',RB:'FB',LCB:'CB',RCB:'CB',CDM:'CDM',LCM:'CM',RCM:'CM',LW:'W',RW:'W',ST:'ST'};
-const POS_KO = {GK:'골키퍼',LB:'왼쪽 풀백',LCB:'왼쪽 센터백',RCB:'오른쪽 센터백',RB:'오른쪽 풀백',CDM:'수비형 미드필더',LCM:'왼쪽 중앙 미드필더',RCM:'오른쪽 중앙 미드필더',LW:'왼쪽 윙어',ST:'스트라이커',RW:'오른쪽 윙어'};
+// The 11 slot ids never change. A formation decides each slot's role, spot on the pitch, label and how teammates call it.
+const NAT433 = {GK:'GK',LB:'FB',RB:'FB',LCB:'CB',RCB:'CB',CDM:'CDM',LCM:'CM',RCM:'CM',LW:'W',RW:'W',ST:'ST'};
+const DEF_KO = {GK:'골키퍼',LB:'왼쪽 풀백',LCB:'왼쪽 센터백',RCB:'오른쪽 센터백',RB:'오른쪽 풀백',CDM:'수비형 미드필더',LCM:'왼쪽 중앙 미드필더',RCM:'오른쪽 중앙 미드필더',LW:'왼쪽 윙어',ST:'스트라이커',RW:'오른쪽 윙어'};
+const DEF_NOUN = {GK:'골키퍼',CB:'센터백',FB:'풀백',CDM:'수비형 미드필더',CM:'중앙 미드필더',W:'윙어',ST:'스트라이커'};
+const FORMS = {
+  '433':{name:'4-3-3', desc:'미드필더 3명이 중원을 잡고, 윙어 2명이 양쪽 측면을 흔드는 공격적인 기본형입니다.',
+    roles:NAT433,
+    base:{GK:[34,99],LB:[9,79],LCB:[24,85],RCB:[44,85],RB:[59,79],CDM:[34,72],LCM:[20,61],RCM:[48,61],LW:[10,47],ST:[34,43],RW:[58,47]}},
+  '442':{name:'4-4-2', desc:'수비 4명, 미드필더 4명, 공격수 2명. 투톱이 문전에서 함께 싸우는 균형형입니다.', wide:true,
+    roles:{GK:'GK',LB:'FB',LCB:'CB',RCB:'CB',RB:'FB',LCM:'CM',RCM:'CM',LW:'W',RW:'W',ST:'ST',CDM:'ST'},
+    base:{GK:[34,99],LB:[9,79],LCB:[24,85],RCB:[44,85],RB:[59,79],LCM:[25,63],RCM:[43,63],LW:[9,56],RW:[59,56],ST:[27,44],CDM:[41,44]},
+    code:{LW:'LM',RW:'RM',ST:'LST',CDM:'RST'},
+    ko:{LW:'왼쪽 측면 미드필더',RW:'오른쪽 측면 미드필더',ST:'왼쪽 스트라이커',CDM:'오른쪽 스트라이커'},
+    noun:{LW:'측면 미드필더',RW:'측면 미드필더'}},
+  '4231':{name:'4-2-3-1', desc:'수비형 미드필더 2명이 뒤를 받치고, 공격형 미드필더가 스트라이커를 돕는 안정적인 형태입니다.',
+    roles:{GK:'GK',LB:'FB',LCB:'CB',RCB:'CB',RB:'FB',CDM:'CDM',LCM:'CDM',RCM:'CM',LW:'W',RW:'W',ST:'ST'},
+    base:{GK:[34,99],LB:[9,78],LCB:[24,85],RCB:[44,85],RB:[59,78],LCM:[25,70],CDM:[43,70],RCM:[34,56],LW:[10,50],ST:[34,43],RW:[58,50]},
+    code:{LCM:'LDM',CDM:'RDM',RCM:'CAM'},
+    ko:{LCM:'왼쪽 수비형 미드필더',CDM:'오른쪽 수비형 미드필더',RCM:'공격형 미드필더'},
+    noun:{RCM:'공격형 미드필더'}},
+  '352':{name:'3-5-2', desc:'수비 3명과 윙백 2명, 중앙 미드필더 3명, 공격수 2명. 중원이 두텁고 양쪽 측면은 윙백이 맡습니다.',
+    roles:{GK:'GK',LB:'FB',RB:'FB',LCB:'CB',CDM:'CB',RCB:'CB',LCM:'CM',RCM:'CM',LW:'CDM',ST:'ST',RW:'ST'},
+    base:{GK:[34,99],LCB:[18,86],CDM:[34,88],RCB:[50,86],LB:[6,66],RB:[62,66],LCM:[22,62],RCM:[46,62],LW:[34,70],ST:[27,44],RW:[41,44]},
+    code:{LB:'LWB',RB:'RWB',CDM:'CB',LW:'CDM',ST:'LST',RW:'RST'},
+    ko:{LB:'왼쪽 윙백',RB:'오른쪽 윙백',CDM:'가운데 센터백',LW:'수비형 미드필더',ST:'왼쪽 스트라이커',RW:'오른쪽 스트라이커'},
+    noun:{LB:'윙백',RB:'윙백'}}
+};
+const ROLE = {}, BASE = {}, POS_KO = {}, CODE = {}, NOUN = {};
+function applyForm(key){
+  const F = FORMS[key] || FORMS['433'];
+  for(const p of POS){ ROLE[p]=F.roles[p]; BASE[p]=F.base[p]; CODE[p]=(F.code&&F.code[p])||p; POS_KO[p]=(F.ko&&F.ko[p])||DEF_KO[p]; NOUN[p]=(F.noun&&F.noun[p])||DEF_NOUN[F.roles[p]]; }
+}
+applyForm('433');
+const slots = r => POS.filter(p=>ROLE[p]===r);
 const STATS = [['pas','패스'],['sho','슈팅'],['dri','드리블'],['def','수비'],['ctl','볼 컨트롤'],['gk','골키핑']];
 const SK = Object.fromEntries(STATS);
 const KEY = {GK:['gk','pas','ctl'],CB:['def','pas','ctl'],FB:['def','pas','dri'],CDM:['pas','def','ctl'],CM:['pas','ctl','dri'],W:['dri','sho','pas'],ST:['sho','ctl','dri']};
@@ -270,21 +311,42 @@ const esc = s => String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&g
 function josa(w,a,b){ const c=String(w).trim().slice(-1).charCodeAt(0)-0xAC00; if(c<0||c>11171) return a+'('+b+')'; return (c%28)?a:b; }
 
 function newSave(){
-  return { coins:10, w:0,d:0,l:0, gf:0, ga:0, round:0, season:1,
-    team: POS.map((p,i)=>{ const pr=PROFILE[ROLE[p]]; const s={}; STATS.forEach(([k],j)=>{ s[k]=Math.max(5,pr[j]+ri(-3,3)); }); return {pos:p,name:NAMES[i],s}; }) };
+  return { coins:10, w:0,d:0,l:0, gf:0, ga:0, round:0, season:1, form:'433',
+    team: POS.map((p,i)=>{ const nat=NAT433[p], pr=PROFILE[nat]; const s={}; STATS.forEach(([k],j)=>{ s[k]=Math.max(5,pr[j]+ri(-3,3)); }); return {pos:p,name:NAMES[i],nat,s}; }) };
 }
+function normSave(o){ o.form = FORMS[o.form] ? o.form : '433'; o.team.forEach(t=>{ if(!t.nat) t.nat = NAT433[t.pos]; }); return o; }
 let save;
 try { save = JSON.parse(localStorage.getItem(STORE)); } catch(e) { save = null; }
 if(!save || !Array.isArray(save.team) || save.team.length!==11) save = newSave();
+normSave(save); applyForm(save.form);
 function exportCode(){ try { return btoa(unescape(encodeURIComponent(JSON.stringify(save)))); } catch(e){ return ''; } }
 function importCode(c){ const o = JSON.parse(decodeURIComponent(escape(atob(c.trim())))); if(!o||!Array.isArray(o.team)||o.team.length!==11) throw new Error('bad'); return o; }
 function persist(){ try { localStorage.setItem(STORE, JSON.stringify(save)); } catch(e) {} }
 
 const P = pos => save.team.find(t=>t.pos===pos);
 const tn = () => save.teamName || '별무리 FC';
-const ovr = t => Math.round(Object.entries(WEIGHT[ROLE[t.pos]]).reduce((a,[k,w])=>a+t.s[k]*w,0));
+const ovrIn = (t,role) => Math.round(Object.entries(WEIGHT[role]).reduce((a,[k,w])=>a+t.s[k]*w,0));
+const ovr = t => ovrIn(t, ROLE[t.pos]);
+// who plays where: each player goes to the slot of the new formation that suits them best (natural role gets a bonus)
+function planFor(key){
+  const roles = FORMS[key].roles;
+  const gkT = save.team.find(t=>t.nat==='GK'), gkS = POS.find(p=>roles[p]==='GK');
+  const pl = save.team.filter(t=>t!==gkT), sl = POS.filter(p=>p!==gkS), n = pl.length;
+  const sc = pl.map(t=>sl.map(p=>ovrIn(t,roles[p])+(t.nat===roles[p]?5:0)+(t.pos===p?1:0)));
+  // best assignment of the 10 outfield players to the 10 outfield slots (dynamic programming over used slots)
+  const N = 1<<n, NEG = -1e9; let cur = new Array(N).fill(NEG); cur[0] = 0; const from = [];
+  for(let i=0;i<n;i++){ const nd = new Array(N).fill(NEG), ch = new Array(N).fill(-1);
+    for(let mask=0;mask<N;mask++){ const v = cur[mask]; if(v===NEG) continue;
+      for(let j=0;j<n;j++){ if(mask&(1<<j)) continue; const nm = mask|(1<<j), val = v+sc[i][j]; if(val>nd[nm]){ nd[nm]=val; ch[nm]=j; } } }
+    cur = nd; from.push(ch); }
+  const plan = [[gkT,gkS]]; let mask = N-1;
+  for(let i=n-1;i>=0;i--){ const j = from[i][mask]; plan.push([pl[i],sl[j]]); mask &= ~(1<<j); }
+  return plan;
+}
+const previewOvr = key => Math.round(planFor(key).reduce((a,[t,p])=>a+ovrIn(t,FORMS[key].roles[p]),0)/11);
+function setForm(key){ if(!FORMS[key]) return; for(const [t,p] of planFor(key)) t.pos = p; save.form = key; applyForm(key); openPos = null; persist(); }
 const teamOvr = () => Math.round(save.team.reduce((a,t)=>a+ovr(t),0)/11);
-const tag = pos => `${P(pos).name}(${pos})`;
+const tag = pos => `${P(pos).name}(${CODE[pos]})`;
 const who = pos => `${POS_KO[pos]} ${tag(pos)}`;
 const nm = pos => P(pos).name;
 const cost = v => Math.max(1, Math.floor((v-40)/10)+1);
@@ -298,75 +360,97 @@ const FLASH = 1300;
 const FX_IN = 600, FX_TIME = 2300;
 const fxHold = () => (m && m.fx && !REDUCED) ? FX_IN + FX_TIME : 0;
 
-const sideOf = p => p[0]==='L'?'L':p[0]==='R'?'R':'C';
-const at = (role,sd) => ({FB:{L:'LB',R:'RB'},CB:{L:'LCB',R:'RCB'},CM:{L:'LCM',R:'RCM'},W:{L:'LW',R:'RW'}})[role][sd];
-const pass = (label,to,toZone,b1,b2) => ({kind:'pass',label,to,toZone,b1,b2});
+const sideOf = p => { const x = BASE[p][0]; return x<30 ? 'L' : x>38 ? 'R' : 'C'; };
+// pick the teammate of a role on a side; if the formation has no such role, fall back to the closest one
+const FALL = {GK:['GK'],CB:['CB','FB'],FB:['FB','CB'],CDM:['CDM','CM'],CM:['CM','CDM'],W:['W','FB','CM'],ST:['ST','W']};
+function at(role, sd, from){
+  for(const r of FALL[role]){
+    const ss = POS.filter(p=>ROLE[p]===r && p!==from && avail(p)).sort((a,b)=>BASE[a][0]-BASE[b][0]);
+    if(!ss.length) continue;
+    if(ss.length===1) return ss[0];
+    const n = Math.ceil(ss.length/2);
+    return pick(sd==='L' ? ss.slice(0,n) : ss.slice(ss.length-n));
+  }
+  return pick(POS.filter(p=>p!=='GK' && p!==from && avail(p)));
+}
+const sideSlot = (role, sd) => slots(role).filter(p=>sideOf(p)===sd)[0] || null;
+// the words in a pass label follow what the receiver really is in this formation (winger -> wing-back, ...)
+const NOUN_WORDS = ['수비형 미드필더','중앙 미드필더','미드필더','센터백','풀백','윙어','스트라이커'];
+function relabel(label, to){
+  const n = NOUN[to]; if(!n) return label;
+  for(const w of NOUN_WORDS){ if(label.includes(w)) return label.replace(new RegExp(w+'(와)?'), (_,wa)=> n + (wa ? josa(n,'과','와') : '')); }
+  return label;
+}
+const pass = (label,to,toZone,b1,b2) => ({kind:'pass',label:relabel(label,to),to,toZone,b1,b2});
 const drib = (label,toZone,b1,stat='dri') => ({kind:'dribble',label,toZone,b1,stat});
 const shot = (label,b1,b2) => ({kind:'shot',label,b1,b2});
 
 function actionsFor(pos, zone){
   const s0 = sideOf(pos), s = s0==='C' ? (R()<.5?'L':'R') : s0, o = s==='L'?'R':'L';
-  switch(ROLE[pos]){
+  const A = (role,sd) => at(role,sd,pos);
+  // with no wingers in the formation (3-5-2) the wing-backs take over the winger's job in the attacking third
+  const rl = (ROLE[pos]==='FB' && !slots('W').length && (zone==='att'||zone==='box')) ? 'W' : ROLE[pos];
+  switch(rl){
     case 'GK': return [
-      pass('센터백에게 짧게 굴려주기',at('CB',s),'def',.96,.94),
-      pass('풀백에게 던져주기',at('FB',o),'def',.93,.90),
-      pass('스트라이커에게 롱킥','ST','att',.80,.58)];
+      pass('센터백에게 짧게 굴려주기',A('CB',s),'def',.96,.94),
+      pass('풀백에게 던져주기',A('FB',o),'def',.93,.90),
+      pass('스트라이커에게 롱킥',A('ST',s),'att',.80,.58)];
     case 'CB': return [
-      pass('수비형 미드필더에게 짧은 패스','CDM','mid',.93,.90),
-      pass('옆 풀백에게 패스',at('FB',s),'def',.95,.92),
-      pass('반대편 윙어에게 대각 롱패스',at('W',o),'att',.72,.68),
+      pass('수비형 미드필더에게 짧은 패스',A('CDM',s),'mid',.93,.90),
+      pass('옆 풀백에게 패스',A('FB',s),'def',.95,.92),
+      pass('반대편 윙어에게 대각 롱패스',A('W',o),'att',.72,.68),
       pass('골키퍼에게 백패스','GK','def',.97,.96)];
     case 'FB': return zone==='att' ? [
-      pass('문전으로 크로스','ST','air',.60,.56),
-      pass('윙어와 2대1 패스',at('W',s),'box',.80,.78),
-      pass('중앙 미드필더에게 컷백',at('CM',s),'att',.90,.90),
-      pass('센터백까지 길게 백패스',at('CB',s),'def',.92,.92)] : [
-      pass('윙어에게 전진 패스',at('W',s),'att',.88,.85),
-      pass('중앙 미드필더에게 안쪽 패스',at('CM',s),'mid',.92,.90),
-      pass('센터백에게 백패스',at('CB',s),'def',.96,.94),
+      pass('문전으로 크로스',A('ST',s),'air',.60,.56),
+      pass('윙어와 2대1 패스',A('W',s),'box',.80,.78),
+      pass('중앙 미드필더에게 컷백',A('CM',s),'att',.90,.90),
+      pass('센터백까지 길게 백패스',A('CB',s),'def',.92,.92)] : [
+      pass('윙어에게 전진 패스',A('W',s),'att',.88,.85),
+      pass('중앙 미드필더에게 안쪽 패스',A('CM',s),'mid',.92,.90),
+      pass('센터백에게 백패스',A('CB',s),'def',.96,.94),
       drib('오버래핑하며 드리블 전진','att',.68)];
     case 'CDM': return [
-      pass('중앙 미드필더에게 패스',at('CM',s),'mid',.93,.90),
-      pass('반대쪽 풀백에게 벌려주기',at('FB',o),'mid',.91,.90),
-      pass('센터백에게 백패스',at('CB',s),'def',.96,.94),
-      pass('스트라이커에게 전진 롱패스','ST','att',.70,.62)];
+      pass('중앙 미드필더에게 패스',A('CM',s),'mid',.93,.90),
+      pass('반대쪽 풀백에게 벌려주기',A('FB',o),'mid',.91,.90),
+      pass('센터백에게 백패스',A('CB',s),'def',.96,.94),
+      pass('스트라이커에게 전진 롱패스',A('ST',s),'att',.70,.62)];
     case 'CM': return zone==='att' ? [
-      pass('스트라이커에게 스루패스','ST','box',.70,.66),
-      pass('윙어에게 벌려주기',at('W',s),'att',.88,.86),
+      pass('스트라이커에게 스루패스',A('ST',s),'box',.70,.66),
+      pass('윙어에게 벌려주기',A('W',s),'att',.88,.86),
       shot('중거리 슛',.46,.32),
-      pass('수비형 미드필더에게 백패스','CDM','mid',.94,.92)] : [
-      pass('윙어에게 찔러주기',at('W',s),'att',.78,.74),
-      pass('사이드 풀백에게 패스',at('FB',s),'mid',.92,.90),
-      pass('센터백에게 백패스',at('CB',s),'def',.95,.93),
+      pass('수비형 미드필더에게 백패스',A('CDM',s),'mid',.94,.92)] : [
+      pass('윙어에게 찔러주기',A('W',s),'att',.78,.74),
+      pass('사이드 풀백에게 패스',A('FB',s),'mid',.92,.90),
+      pass('센터백에게 백패스',A('CB',s),'def',.95,.93),
       drib('직접 드리블로 전진','att',.66)];
     case 'W': return zone==='box' ? [
       shot('각을 좁혀 슛',.66,.60),
-      pass('스트라이커에게 컷백','ST','box',.84,.80),
-      pass('중앙 미드필더에게 빼주기',at('CM',s),'att',.90,.88)] : [
+      pass('스트라이커에게 컷백',A('ST',s),'box',.84,.80),
+      pass('중앙 미드필더에게 빼주기',A('CM',s),'att',.90,.88)] : [
       drib('1대1 드리블 돌파','box',.64),
-      pass('문전으로 크로스','ST','air',.60,.55),
+      pass('문전으로 크로스',A('ST',s),'air',.60,.55),
       shot('컷인 후 감아차기',.52,.40),
-      pass('중앙 미드필더에게 백패스',at('CM',s),'mid',.92,.90)];
+      pass('중앙 미드필더에게 백패스',A('CM',s),'mid',.92,.90)];
     case 'ST':
       if(zone==='air') return [
         shot('헤더 슛',.56,.45),
         drib('가슴 트래핑 후 자리 잡기','box',.62,'ctl'),
-        pass('미드필더에게 머리로 떨궈주기',at('CM',s),'att',.74,.80)];
+        pass('미드필더에게 머리로 떨궈주기',A('CM',s),'att',.74,.80)];
       if(zone==='box') return [
         shot('골문 구석으로 슛',.72,.64),
         shot('골키퍼 키를 넘기는 칩슛',.54,.74),
-        pass('윙어에게 내주기',at('W',s),'box',.84,.80)];
+        pass('윙어에게 내주기',A('W',s),'box',.84,.80)];
       return [
-        pass('등지고 미드필더에게 연계',at('CM',s),'att',.90,.88),
+        pass('등지고 미드필더에게 연계',A('CM',s),'att',.90,.88),
         drib('터닝 후 돌파','box',.60),
-        pass('윙어에게 주고 침투 (2대1)',at('W',s),'box',.80,.78),
+        pass('윙어에게 주고 침투 (2대1)',A('W',s),'box',.80,.78),
         shot('중거리 슛',.46,.32)];
   }
 }
 
 const tired = () => (m && m.half===2 && m.min>=70) ? 1 : 0;
 function offRisk(a){
-  if(a.kind!=='pass' || a.to!=='ST') return 0;
+  if(a.kind!=='pass' || ROLE[a.to]!=='ST') return 0;
   let r = 0;
   if(a.toZone==='box') r = a.run ? .14 : .18;
   else if(/롱/.test(a.label)) r = .10;
@@ -383,17 +467,17 @@ function probs(a){
 
 // ---------- defending: 3 stages (front press -> midfield -> last line) then goalkeeper ----------
 const STAGE = {
-  front:{name:'전방 압박', zone:'att', list:['LW','ST','RW'], shift:-18,
+  front:{name:'전방 압박', zone:'att', get list(){ return POS.filter(p=>ROLE[p]==='W'||ROLE[p]==='ST'); }, shift:-18,
     opts:[
       {label:'강하게 전방 압박', b:.42, win:'ball', fail:'next-', note:'성공하면 상대 진영에서 바로 역습, 실패하면 뒷공간이 열림'},
       {label:'패스길 막으며 물러서기', b:.74, win:'next+', fail:'next', note:'공은 못 뺏지만 다음 수비가 쉬워짐'},
       {label:'뒤에서 몸으로 끊기', b:.55, win:'ball', fail:'foul', note:'실패하면 파울, 경고 확률 40%'}]},
-  mid:{name:'중원 수비', zone:'mid', list:['CDM','CDM','LCM','RCM'], shift:-8,
+  mid:{name:'중원 수비', zone:'mid', get list(){ return [...slots('CDM'),...slots('CDM'),...slots('CM')]; }, shift:-8,
     opts:[
       {label:'패스 길목 인터셉트', b:.48, win:'ball', fail:'next-', note:'성공하면 중원에서 되찾고, 실패하면 수비 라인이 흔들림'},
       {label:'자리 지키며 지연', b:.74, win:'next+', fail:'next', note:'공은 못 뺏지만 수비 라인이 정비됨'},
       {label:'전술적 파울로 끊기', b:1, win:'tactical', fail:'tactical', note:'역습은 확실히 끊지만 경고 확률 65%'}]},
-  back:{name:'최종 수비', zone:'def', list:['LCB','RCB','LCB','RCB','LB','RB'], shift:0,
+  back:{name:'최종 수비', zone:'def', get list(){ return [...slots('CB'),...slots('CB'),...slots('FB')]; }, shift:0,
     opts:[
       {label:'슬라이딩 태클', b:.60, win:'ball', fail:'foulbox', note:'성공하면 바로 뺏고, 실패하면 1대1 위기나 페널티킥'},
       {label:'버티며 지연 수비', b:.74, win:'long', fail:'normal', note:'성공해도 상대가 먼 거리에서 슛을 때림'},
@@ -443,7 +527,8 @@ function refreshActions(){
 }
 function setHolder(pos, zone, line){
   m.mode='attack'; m.holder=pos; m.zone=zone; m.run=null; m.expose=0;
-  m.baseActions = actionsFor(pos,zone).filter(a=>!a.to||avail(a.to)).map(a=>({...a, from:pos}));
+  const seen = new Set();
+  m.baseActions = actionsFor(pos,zone).filter(a=>!a.to||avail(a.to)).filter(a=>{ if(a.kind!=='pass') return true; if(seen.has(a.to)) return false; seen.add(a.to); return true; }).map(a=>({...a, from:pos}));
   refreshActions();
   m.situ = line || `${who(pos)}${josa(nm(pos),'이','가')} 공을 잡았습니다.`;
 }
@@ -461,7 +546,7 @@ function oppAttack(from){
   m.run=null;
   const own = save.team.reduce((a,t)=>a+ovr(t),0)/11;
   if(R() < cl(.14 + (own-m.opp.ovr)*.006 + tired()*.04, .04, .3)){
-    const w = pickAvail(['CDM','LCM','RCM']);
+    const w = pickAvail([...slots('CDM'),...slots('CM')]);
     say(`${m.opp.name}의 패스 실수! ${tag(w)}${josa(nm(w),'이','가')} 공을 줍습니다.`,'ok');
     flash(`상대의 패스가 흐르며 ${tag(w)}${josa(nm(w),'이','가')} 공을 되찾았습니다!`,'ok');
     setHolder(w,'mid'); return;
@@ -503,7 +588,7 @@ function doAttack(i){
       if(R()<p2){
         say(a.toZone==='air' ? `${tag(a.from)}의 크로스가 정확히 날아갑니다. ${tag(a.to)}${josa(nm(a.to),'이','가')} 공중볼 경합에 뛰어듭니다.`
           : `${tag(a.from)} → ${tag(a.to)}, ${a.label} 성공.`,'ok');
-        setHolder(a.to, a.toZone, a.toZone==='air' ? `크로스가 문전으로! 스트라이커 ${tag('ST')}, 선택하세요.` : null);
+        setHolder(a.to, a.toZone, a.toZone==='air' ? `크로스가 문전으로! ${NOUN[a.to]} ${tag(a.to)}, 선택하세요.` : null);
       } else {
         const role = lostBall(a, true);
         say(pick([`패스는 정확했지만 ${tag(a.to)}의 트래핑이 길어졌고, ${role}가 공을 가로챕니다.`,`좋은 패스였지만 ${tag(a.to)}${josa(nm(a.to),'이','가')} 받기 직전, ${role}가 가로챕니다.`]),'bad');
@@ -562,7 +647,7 @@ function doGK(i){
   if(R()<saveProb(o,type)){ say(`${tag('GK')}의 선방! 공을 잡아냅니다.`,'ok'); setHolder('GK','def'); }
   else {
     m.them++; say(`실점. ${m.opp.name}의 골이 들어갑니다.`,'them'); flash('실점했습니다.','bad');
-    const k = pickAvail(['LCM','RCM','CDM']);
+    const k = pickAvail([...slots('CM'),...slots('CDM')]);
     setHolder(k,'mid',`우리 팀 킥오프. ${who(k)}${josa(nm(k),'이','가')} 공을 받았습니다.`);
   }
 }
@@ -596,7 +681,6 @@ function finish(){
 
 
 // ---------- pitch drawing ----------
-const BASE = {GK:[34,99],LB:[9,79],LCB:[24,85],RCB:[44,85],RB:[59,79],CDM:[34,72],LCM:[20,61],RCM:[48,61],LW:[10,47],ST:[34,43],RW:[58,47]};
 const SHIFT = {def:0, mid:-10, att:-22, box:-28, air:-28};
 let lastPos = null;
 const horiz = () => matchMedia('(max-width: 759px)').matches;
@@ -605,31 +689,35 @@ function formation(){
   const sh = !m ? 0 : m.mode==='attack' ? (SHIFT[m.zone]||0) : m.mode==='defend' ? STAGE[m.stage].shift : 0, out = {};
   for(const p of POS){ const [x,y]=BASE[p]; const k = p==='GK'?0.12 : (ROLE[p]==='CB'||ROLE[p]==='FB')?0.8:1; out[p]=[x, Math.max(9,y+sh*k)]; }
   if(m && m.mode==='attack'){
-    const h=m.holder, r=ROLE[h];
+    const h=m.holder, r=ROLE[h], hx=BASE[h][0], cdm=slots('CDM')[0];
     if(m.zone==='box'||m.zone==='air'){
-      if(r==='ST') out[h]=[34, m.zone==='air'?12:16];
+      if(r==='ST') out[h]=[Math.abs(hx-34)<4?34:(hx<34?29:39), m.zone==='air'?12:16];
       else if(r==='W'||r==='FB') out[h]=[sideOf(h)==='L'?19:49,15];
     } else if(r==='FB' && m.zone==='att') out[h]=[sideOf(h)==='L'?6:62, 30];
-    // overlap: the winger tucks inside, the full-back runs past on the outside and a bit ahead
-    if(m.run==='overL'){ const wy=out.LW[1]; out.LW=[22, wy]; out.LB=[6, Math.max(12, wy-7)]; }
-    if(m.run==='overR'){ const wy=out.RW[1]; out.RW=[46, wy]; out.RB=[62, Math.max(12, wy-7)]; }
-    if(m.run==='stRun') out.ST=[34, m.zone==='mid'?24:14];
+    // overlap: the winger (or the wide central midfielder) tucks inside, the full-back runs past on the outside and a bit ahead
+    for(const [key,sd] of [['overL','L'],['overR','R']]){ if(m.run!==key) continue;
+      const fb=RUNS[key].fb, w=sideSlot('W',sd)||sideSlot('CM',sd);
+      if(w && w!==fb){ const wy=out[w][1]; out[w]=[sd==='L'?22:46, wy]; out[fb]=[sd==='L'?6:62, Math.max(12, wy-7)]; }
+      else out[fb]=[sd==='L'?6:62, Math.max(12, out[fb][1]-14)]; }
+    if(m.run==='stRun') out.ST=[BASE.ST[0], m.zone==='mid'?24:14];
     const side = sideOf(h), far = side==='L'?'R':side==='R'?'L':null;
     // build-up from the back: the holding midfielder drops between the centre-backs, full-backs push up
     if(m.zone==='def' && !m.run){
-      out.CDM=[34,80]; out.LCB=[20,86]; out.RCB=[48,86]; out.LB=[9,68]; out.RB=[59,68];
-      if(h==='CDM') out.CDM=[34,76];
+      const cbs = slots('CB');
+      if(cbs.length===2) for(const p of cbs) out[p]=[BASE[p][0]<34?20:48, 86];
+      if(cdm) out[cdm]=[BASE[cdm][0], h===cdm?76:80];
+      for(const p of slots('FB')) out[p]=[BASE[p][0], BASE[p][1]-11];
     }
     // rest defence: while we attack, the far-side full-back tucks in and the holding midfielder stays back
     if((m.zone==='att'||m.zone==='box'||m.zone==='air') && !m.run){
-      if(far){ const fb=far==='L'?'LB':'RB'; if(h!==fb) out[fb]=[far==='L'?20:48, 66]; }
-      if(h!=='CDM') out.CDM=[34,66];
+      if(far){ const fb=sideSlot('FB',far); if(fb && h!==fb) out[fb]=[far==='L'?20:48, 66]; }
+      if(cdm && h!==cdm) out[cdm]=[BASE[cdm][0], 66];
     }
     // box crashers: far-side winger to the far post, a midfielder arriving at the edge of the box
     if(m.zone==='box'||m.zone==='air'){
-      if(far){ const w=far==='L'?'LW':'RW'; if(h!==w) out[w]=[far==='L'?24:44, 17]; }
-      const cm = side==='L'?'RCM':'LCM'; if(h!==cm && h!=='LCM'&&h!=='RCM') out[cm]=[cm==='LCM'?25:43, 32];
-      else if(h==='LCM'||h==='RCM'){ const o=h==='LCM'?'RCM':'LCM'; out[o]=[o==='LCM'?25:43, 32]; }
+      if(far){ const w=sideSlot('W',far); if(w && h!==w) out[w]=[far==='L'?24:44, 17]; }
+      if(h==='LCM'||h==='RCM'){ const o=h==='LCM'?'RCM':'LCM'; if(ROLE[o]==='CM') out[o]=[o==='LCM'?25:43, 32]; }
+      else { const cm = side==='L'?'RCM':'LCM'; if(ROLE[cm]==='CM') out[cm]=[cm==='LCM'?25:43, 32]; }
     }
   }
   return out;
@@ -650,7 +738,7 @@ function playerG(p,[x,y],opts={}){
   const t=P(p), has=opts.holder===p, off=!!(m&&opts.live&&m.reds.includes(p)), yc=!!(m&&opts.live&&m.cards[p]===1);
   const label = off ? `${t.name} 퇴장` : opts.ovr ? `${t.name} ${ovr(t)}` : t.name;
   return `<g class="pl-g ${has?'has':''} ${opts.mark===p?'mark':''} ${opts.run===p?'runner':''} ${off?'off':''}" data-p="${p}" ${opts.jump?`data-jump="${p}" role="button" tabindex="0" aria-label="${esc(t.name)} 카드로 이동"`:''} style="transform:translate(${x}px,${y}px)">
-    ${opts.run===p?'<circle class="runring" r="4.4"/>':''}<circle class="dot" r="3.1"/><text class="ps" y=".1">${p}</text><text class="nm" y="5.3">${esc(label)}</text>${has&&opts.ball?'<circle class="ball" cx="3.4" cy="-2.6" r="1.3"/>':''}${yc?'<rect class="yc" x="2.2" y="-4.2" width="1.6" height="2.2" rx=".2"/>':''}</g>`;
+    ${opts.run===p?'<circle class="runring" r="4.4"/>':''}<circle class="dot" r="3.1"/><text class="ps" y=".1">${CODE[p]}</text><text class="nm" y="5.3">${esc(label)}</text>${has&&opts.ball?'<circle class="ball" cx="3.4" cy="-2.6" r="1.3"/>':''}${yc?'<rect class="yc" x="2.2" y="-4.2" width="1.6" height="2.2" rx=".2"/>':''}</g>`;
 }
 function matchPositions(h){ const f=formation(), o={}; for(const p of POS) o[p]=T(f[p],h); return o; }
 function matchField(){
@@ -678,8 +766,8 @@ function matchField(){
 }
 function squadField(){
   const g = POS.map(p=>{ const [x,y]=BASE[p]; return playerG(p,[x, 14+(y-43)/(99-43)*83],{ovr:true,jump:true}); }).join('');
-  return `<div class="pitchwrap"><svg class="field v" viewBox="-3 -3 74 111" role="img" aria-label="4-3-3 선수 배치">${fieldLines(false)}${g}</svg>
-    <div class="legend"><span>4-3-3 · 이름 옆 숫자는 OVR · 선수를 누르면 카드로 이동</span></div></div>`;
+  return `<div class="pitchwrap"><svg class="field v" viewBox="-3 -3 74 111" role="img" aria-label="${FORMS[save.form].name} 선수 배치">${fieldLines(false)}${g}</svg>
+    <div class="legend"><span>${FORMS[save.form].name} · 이름 옆 숫자는 OVR · 선수를 누르면 카드로 이동</span></div></div>`;
 }
 function animateField(){
   if(view!=='match'||!m||m.mode==='end'){ lastPos=null; return; }
@@ -726,7 +814,7 @@ function renderHome(){
     <span class="eyebrow">시즌 ${save.season} · ${save.round+1}라운드 / ${OPPS.length}</span>
     <input id="team-name" class="teamname" data-team="1" value="${esc(tn())}" maxlength="14" aria-label="팀 이름">
     <span class="muted" style="font-size:12px">팀 이름을 눌러서 바꿀 수 있습니다. 선수 이름은 선수단에서 바꿉니다.</span>
-    <span class="muted">4-3-3 · 팀 평균 능력치 <span class="mono">${teamOvr()}</span></span>
+    <span class="muted">${FORMS[save.form].name} · 팀 평균 능력치 <span class="mono">${teamOvr()}</span></span>
   </header>
   <div class="stats">
     <div><span class="muted" style="font-size:12px">승 · 무 · 패</span><b>${save.w}-${save.d}-${save.l}</b></div>
@@ -758,20 +846,28 @@ function renderHome(){
   </section>`;
 }
 
+function formPicker(){
+  const lock = !!(m && m.mode!=='end');
+  return `<section class="formpick"><span class="eyebrow">포메이션</span>
+    <div class="fchips" role="group" aria-label="포메이션 선택">${Object.keys(FORMS).map(k=>`<button class="fchip" data-form="${k}" aria-pressed="${save.form===k}" ${lock?'disabled':''}><b>${FORMS[k].name}</b><small>팀 능력치 ${previewOvr(k)}</small></button>`).join('')}</div>
+    <span class="muted" style="font-size:13px">${esc(FORMS[save.form].desc)}</span>
+    <span class="muted" style="font-size:12px">${lock?'경기 중에는 포메이션을 바꿀 수 없습니다.':'포메이션을 바꾸면 선수들이 새 포지션에 가장 잘 맞게 다시 배치됩니다. 자리가 맞지 않는 선수가 생기면 팀 능력치가 조금 달라질 수 있습니다.'}</span></section>`;
+}
 function renderSquad(){
-  const groups = [['골키퍼',['GK']],['수비수',['LB','LCB','RCB','RB']],['미드필더',['CDM','LCM','RCM']],['공격수',['LW','ST','RW']]];
+  const F = FORMS[save.form], inRole = (...rs) => POS.filter(p=>rs.includes(ROLE[p])).sort((a,b)=>BASE[a][0]-BASE[b][0]);
+  const groups = [['골키퍼',['GK']],['수비수',inRole('CB','FB')],['미드필더',inRole('CDM','CM',...(F.wide?['W']:[]))],['공격수',inRole('ST',...(F.wide?[]:['W']))]];
   return nav() + `
   <header style="display:flex;flex-direction:column;gap:6px">
     <h1>선수단</h1>
     <span class="muted" style="font-size:13px">선수를 누르면 육성 창이 열립니다. ▲ 버튼을 누르면 능력치가 1 오르고, 드는 코인은 현재 수치가 높을수록 커집니다. 테두리가 진한 칸이 그 포지션의 핵심 능력치입니다.</span>
-  </header><div class="sqgrid">${squadField()}<div class="sqlist">` + groups.map(([g,ps])=>`
+  </header>${formPicker()}<div class="sqgrid">${squadField()}<div class="sqlist">` + groups.map(([g,ps])=>`
   <section class="group"><span class="eyebrow">${g}</span>
   ${ps.map(p=>{ const t=P(p), key=KEY[ROLE[p]];
     const order = [...key, ...STATS.map(s=>s[0]).filter(k=>!key.includes(k))];
     const open = openPos===p;
     return `<article class="pl ${open?'open':''}" id="card-${p}">
       <button class="pl-toggle" data-open="${p}" aria-expanded="${open}" aria-controls="body-${p}">
-        <span class="badge">${p}</span>
+        <span class="badge">${CODE[p]}</span>
         <span class="pl-sum"><b>${esc(t.name)}</b><span>${key.map(k=>`${SK[k]} ${t.s[k]}`).join(' · ')}</span></span>
         <span class="ovr"><small>OVR</small>${ovr(t)}</span><span class="chev" aria-hidden="true">${open?'▴':'▾'}</span></button>
       ${open?`<div class="pl-body" id="body-${p}">
@@ -865,6 +961,7 @@ app.addEventListener('click', e=>{
   const j = e.target.closest('[data-jump]'); if(j){ jumpTo(j.dataset.jump); return; }
   const b = e.target.closest('button'); if(!b) return;
   if(b.dataset.run){ if(Date.now()<lockUntil||!m||m.mode!=='attack') return; m.run = m.run===b.dataset.run ? null : b.dataset.run; refreshActions(); m.turn=[]; m.flash=null; m.fq=[]; m.ev=null; render(); return; }
+  if(b.dataset.form){ if(m && m.mode!=='end') return; setForm(b.dataset.form); const y=window.scrollY; render(); window.scrollTo(0,y); return; }
   if(b.dataset.open){ const p=b.dataset.open; openPos = openPos===p ? null : p; const y=window.scrollY; render(); window.scrollTo(0,y); return; }
   if(b.dataset.go){ view=b.dataset.go; confirmReset=false; if(view!=='match') m = (m&&m.mode==='end')?null:m; render(); window.scrollTo(0,0); return; }
   if(b.dataset.choice!==undefined){
@@ -889,11 +986,11 @@ app.addEventListener('click', e=>{
     try { navigator.clipboard.writeText(t.value).then(done,()=>{ t.select(); msg.textContent='코드가 선택되었습니다. 길게 눌러 복사하세요.'; }); }
     catch(err){ t.select(); msg.textContent='코드가 선택되었습니다. 길게 눌러 복사하세요.'; } }
   if(act==='load'){ const msg=document.getElementById('code-msg');
-    try { save=importCode(document.getElementById('load-code').value); persist(); render(); }
+    try { save=normSave(importCode(document.getElementById('load-code').value)); applyForm(save.form); persist(); render(); }
     catch(err){ msg.textContent='코드를 읽지 못했습니다. 처음부터 끝까지 빠짐없이 붙여 넣었는지 확인해 주세요.'; msg.style.color='var(--danger)'; } }
   if(act==='reset-no'){ confirmReset=false; render(); }
   if(act==='quit-yes'){ m=null; view='home'; confirmReset=false; render(); window.scrollTo(0,0); }
-  if(act==='reset-yes'){ save=newSave(); persist(); confirmReset=false; render(); }
+  if(act==='reset-yes'){ save=newSave(); applyForm('433'); persist(); confirmReset=false; render(); }
 });
 app.addEventListener('keydown', e=>{ const j=e.target.closest&&e.target.closest('[data-jump]'); if(j&&(e.key==='Enter'||e.key===' ')){ e.preventDefault(); jumpTo(j.dataset.jump); } });
 app.addEventListener('change', e=>{

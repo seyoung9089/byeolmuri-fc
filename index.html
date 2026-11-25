@@ -586,7 +586,7 @@ function secondHalf(){
 function finish(){
   m.mode='end'; m.min=Math.max(90,m.min);
   const res = m.us>m.them?'w':m.us===m.them?'d':'l';
-  const reward = {w:10,d:6,l:3}[res] + m.us*2;
+  const reward = {w:15,d:9,l:5}[res] + m.us*3;
   m.res=res; m.reward=reward;
   save.coins+=reward; save[res]++; save.gf+=m.us; save.ga+=m.them;
   save.round++; if(save.round>=OPPS.length){ save.round=0; save.season++; m.newSeason=true; }
@@ -743,7 +743,7 @@ function renderHome(){
     <span class="eyebrow">규칙</span>
     <span>패스는 두 번 판정합니다. 보내는 선수의 패스로 한 번, 받는 선수의 볼 컨트롤로 한 번입니다. 버튼 오른쪽 숫자는 두 판정을 합친 성공 확률입니다.</span>
     <span>공을 뺏기면 수비가 시작됩니다. 공격수의 전방 압박, 미드필더의 중원 수비, 수비수의 최종 수비, 골키퍼 순서로 막습니다. 파울을 하면 경고를 받을 수 있고, 경고 두 장이면 퇴장입니다.</span>
-    <span>승리 10 · 무승부 6 · 패배 3 코인, 골마다 2 코인을 더 받습니다.</span>
+    <span>승리 15 · 무승부 9 · 패배 5 코인, 골마다 3 코인을 더 받습니다.</span>
     ${played ? '' : '<span>기록은 이 브라우저에 저장됩니다.</span>'}
     <details class="savecode"><summary>다른 기기로 옮기기 (저장 코드)</summary>
       <span>이 코드를 복사해 두었다가 다른 폰이나 컴퓨터에서 붙여 넣으면 내 팀을 그대로 이어서 할 수 있습니다.</span>

@@ -57,6 +57,25 @@ h2{font-size:17px;margin:0;font-weight:700}
 .fchip:disabled{opacity:.5;cursor:not-allowed}
 @media (max-width:480px){.fchips{grid-template-columns:repeat(2,1fr)}}
 
+.league{display:flex;flex-direction:column;gap:10px}
+.bar{height:8px;background:var(--line);border-radius:4px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent)}
+.btn.small{padding:7px 12px;font-size:13px}
+.items{display:flex;flex-direction:column;gap:8px}
+.itm{display:flex;justify-content:space-between;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 14px}
+.itm div{display:flex;flex-direction:column;min-width:0}
+.itm .muted{font-size:12px}
+.itm.lock{opacity:.55}
+.itm.own{border-color:var(--accent)}
+.tagown{font-size:12px;color:var(--accent);font-weight:700}
+.gen{font-size:11px;font-weight:700;color:var(--gold);border:1px solid var(--gold);border-radius:4px;padding:0 4px;margin-left:4px}
+.sell{display:flex;flex-direction:column;gap:6px;align-items:flex-start;border-top:1px solid var(--line);padding-top:10px;margin-top:6px}
+.promo{font-size:14px;font-weight:700;text-align:center;text-wrap:balance;max-width:100%;overflow-wrap:anywhere}
+.promo.up{color:var(--accent)} .promo.down{color:var(--danger)}
+.ratings{font-size:13px;text-align:left;width:100%}
+.ratings ol{list-style:none;margin:6px 0 0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:2px 16px}
+.ratings li{display:flex;justify-content:space-between;gap:8px}
+
 /* match */
 .board{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px}
 .board .t{font-size:13px;color:var(--muted);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -298,6 +317,28 @@ const KEY = {GK:['gk','pas','ctl'],CB:['def','pas','ctl'],FB:['def','pas','dri']
 const WEIGHT = {GK:{gk:.8,pas:.1,ctl:.1},CB:{def:.6,pas:.2,ctl:.2},FB:{def:.4,pas:.3,dri:.3},CDM:{def:.4,pas:.4,ctl:.2},CM:{pas:.45,ctl:.3,dri:.25},W:{dri:.4,sho:.3,pas:.15,ctl:.15},ST:{sho:.55,ctl:.25,dri:.2}};
 const PROFILE = {GK:[50,20,25,30,50,62],CB:[50,30,40,61,52,10],FB:[56,38,56,55,55,10],CDM:[60,42,50,58,58,10],CM:[62,50,56,46,60,10],W:[55,56,62,30,58,10],ST:[48,62,56,25,58,10]};
 const NAMES = ['한유준','이서준','정우진','최민재','박지호','강하람','김도윤','윤시우','장태오','임건우','조은찬'];
+// ---------- leagues, club value, items ----------
+const LEAGUE_UP = 1.10, CV_PER = 4, COIN_K = 7, CV_BASE = 30, ITEM_BASE = 40, PROMO_COOL = 5;
+const fOf = L => Math.pow(LEAGUE_UP, 10-L);            // every league is 10% stronger than the one below
+const cOf = L => fOf(L)*fOf(L);                          // coins (rewards, prices) grow with the square: stats cost more per point and each point matters less
+const needCV = L => CV_PER*(11-L);                       // club value needed to open the promotion match
+const CITY = ['한강','북악','남해','설악','동해','금강','낙동','백두'];
+const SUFFIX = ['','동호회','아마추어','실업팀','세미프로','프로 2군','프로','1군 강호','리그 정상급','월드클래스'];
+const TPL = [
+  {name:'패스 캠프', n:2, st:'pas', who:()=>true, d:'전 선수 패스'},
+  {name:'공격수 슈팅 특훈', n:4, st:'sho', who:t=>t.nat==='ST'||t.nat==='W', d:'공격수·윙어 슈팅'},
+  {name:'수비 조직력 훈련', n:3, st:'def', who:t=>t.nat==='CB'||t.nat==='FB', d:'수비수 수비'},
+  {name:'육성비 할인 쿠폰', disc:true, d:'모든 육성비 10% 할인(최대 50%)'},
+  {name:'골키퍼 전담 코치', n:5, st:'gk', who:t=>t.nat==='GK', d:'골키퍼 골키핑'},
+  {name:'볼 컨트롤 교실', n:2, st:'ctl', who:()=>true, d:'전 선수 볼 컨트롤'},
+  {name:'미드필더 비전 훈련', n:4, st:'pas', who:t=>t.nat==='CM'||t.nat==='CDM', d:'미드필더 패스'},
+  {name:'드리블 클리닉', n:3, st:'dri', who:t=>t.nat==='W'||t.nat==='FB'||t.nat==='CM', d:'윙어·풀백·중앙 미드필더 드리블'},
+  {name:'풀 트레이닝', n:1, st:'*', who:()=>true, d:'전 선수 모든 능력치'}];
+// 3 items per league tier: two unlock at club value +2, the third at +4
+const ITEMS = Array.from({length:30}, (_,idx)=>{ const tier = Math.floor(idx/3), slot = idx%3, tpl = TPL[idx%9], league = 10-tier, f = fOf(league);
+  const n = tpl.disc ? 0 : Math.max(1, Math.round(tpl.n*f));
+  return {id:'i'+idx, tier, league, disc:!!tpl.disc, st:tpl.st, who:tpl.who, n, unlock:CV_PER*tier+(slot<2?2:4), cost:Math.round(ITEM_BASE*f*f*(1+.2*slot)),
+    name:`${tpl.name} (${league}부)`, desc: tpl.disc ? tpl.d : `${tpl.d} +${n}`}; });
 const OPPS = [['1학년 연합팀',50],['방과후 풋살반',53],['동네 조기축구회',56],['체육선생님 팀',59],['졸업생 OB',62],['옆 학교 축구부',65],['시 유소년 선발',69],['지역 고교 올스타',73]];
 const ZONES = [['def','우리 진영'],['mid','중원'],['att','상대 진영'],['box','페널티 박스']];
 const ZONE_KO = {def:'우리 진영',mid:'중원',att:'상대 진영',box:'페널티 박스',air:'문전 공중볼'};
@@ -305,16 +346,20 @@ const STORE = 'byeolmuri-fc-v1';
 
 const R = Math.random;
 const ri = (a,b) => a + Math.floor(R()*(b-a+1));
-const cl = (p,lo=.05,hi=.97) => Math.max(lo,Math.min(hi,p));
+const cl = (p,lo=.05,hi=.95) => Math.max(lo,Math.min(hi,p));
 const pick = arr => arr[Math.floor(R()*arr.length)];
 const esc = s => String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 function josa(w,a,b){ const c=String(w).trim().slice(-1).charCodeAt(0)-0xAC00; if(c<0||c>11171) return a+'('+b+')'; return (c%28)?a:b; }
 
 function newSave(){
-  return { coins:10, w:0,d:0,l:0, gf:0, ga:0, round:0, season:1, form:'433',
-    team: POS.map((p,i)=>{ const nat=NAT433[p], pr=PROFILE[nat]; const s={}; STATS.forEach(([k],j)=>{ s[k]=Math.max(5,pr[j]+ri(-3,3)); }); return {pos:p,name:NAMES[i],nat,s}; }) };
+  return { coins:200, w:0,d:0,l:0, gf:0, ga:0, round:0, season:1, form:'433', league:10, cv:0, lRound:0, cool:0, items:{}, champ:false,
+    team: POS.map((p,i)=>{ const nat=NAT433[p], pr=PROFILE[nat]; const s={}; STATS.forEach(([k],j)=>{ s[k]=Math.max(5,pr[j]+ri(-3,3)); }); return {pos:p,name:NAMES[i],nat,s,inv:0,gen:1,hist:[]}; }) };
 }
-function normSave(o){ o.form = FORMS[o.form] ? o.form : '433'; o.team.forEach(t=>{ if(!t.nat) t.nat = NAT433[t.pos]; }); return o; }
+function normSave(o){ o.form = FORMS[o.form] ? o.form : '433';
+  o.league = (o.league>=1 && o.league<=10) ? (o.league|0) : 10; o.cv = Math.max(0, o.cv|0); o.lRound = o.lRound|0; o.cool = o.cool|0;
+  o.items = (o.items && typeof o.items==='object') ? o.items : {}; o.champ = !!o.champ;
+  o.team.forEach(t=>{ if(!t.nat) t.nat = NAT433[t.pos]; t.inv = t.inv|0; t.gen = t.gen||1; if(!Array.isArray(t.hist)) t.hist = []; });
+  return o; }
 let save;
 try { save = JSON.parse(localStorage.getItem(STORE)); } catch(e) { save = null; }
 if(!save || !Array.isArray(save.team) || save.team.length!==11) save = newSave();
@@ -349,11 +394,34 @@ const teamOvr = () => Math.round(save.team.reduce((a,t)=>a+ovr(t),0)/11);
 const tag = pos => `${P(pos).name}(${CODE[pos]})`;
 const who = pos => `${POS_KO[pos]} ${tag(pos)}`;
 const nm = pos => P(pos).name;
-const cost = v => Math.max(1, Math.floor((v-40)/10)+1);
-function nextOpp(){ const [n,o]=OPPS[save.round % OPPS.length]; return {name:n, ovr:o+(save.season-1)*5}; }
+const discCount = () => ITEMS.filter(i=>i.disc && save.items[i.id]).length;
+const cost = v => Math.max(1, Math.round(Math.max(1, Math.floor((v-40)/10)+1) * Math.max(.5, 1-.1*discCount())));
+function upgrade(p,k){ const t=P(p), c=cost(t.s[k]); if(save.coins<c) return false; save.coins-=c; t.s[k]++; t.inv+=c; persist(); return true; }
+const cvStep = () => save.cv - CV_PER*(10-save.league);
+const cvCost = () => Math.round(CV_BASE*cOf(save.league)*(1+.25*cvStep()));
+const cvFull = () => save.cv >= needCV(save.league);
+const promoReady = () => cvFull() && save.cool<=0 && !(save.league===1 && save.champ);
+function investCV(){ if(cvFull()) return false; const c=cvCost(); if(save.coins<c) return false; save.coins-=c; save.cv++; persist(); return true; }
+function buyItem(id){ const it = ITEMS.find(x=>x.id===id);
+  if(!it || save.items[id] || save.cv<it.unlock || save.coins<it.cost) return false;
+  save.coins -= it.cost; save.items[id] = 1;
+  if(!it.disc) save.team.filter(it.who).forEach(t=>{ if(it.st==='*') STATS.forEach(([k])=>{ t.s[k]+=it.n; }); else t.s[it.st]+=it.n; });
+  persist(); return true; }
+// 몸값: what a club would pay. Based on the coins put into the player, scaled by recent form (last 5 ratings).
+const ratingAvg = t => t.hist && t.hist.length ? t.hist.reduce((a,b)=>a+b,0)/t.hist.length : 6;
+const salePct = t => Math.max(.55, Math.min(1, .62 + (ratingAvg(t)-6)*.12));
+const salePrice = t => Math.round(t.inv * salePct(t));
+function sell(p){ const t=P(p), pr=PROFILE[t.nat]; save.coins += salePrice(t);
+  STATS.forEach(([k],j)=>{ t.s[k] = Math.max(5, pr[j]+ri(-3,3)); }); t.inv = 0; t.gen = (t.gen||1)+1; t.hist = []; persist(); }
+function nextOpp(promo){
+  const L = save.league, f = fOf(L);
+  if(promo) return {name: L>1 ? `${L-1}부 승격 관문 · ${CITY[L%8]} ${SUFFIX[10-(L-1)]||'동호회'}` : '1부 우승 결정전', ovr: Math.round((L>1?64:68)*f), promo:true};
+  const i = save.lRound % OPPS.length;
+  return {name: L===10 ? OPPS[i][0] : `${CITY[i]} ${SUFFIX[10-L]}`, ovr: Math.round(OPPS[i][1]*f), promo:false};
+}
 
 // ---------- match engine ----------
-let view = 'home', m = null, confirmReset = false, lockUntil = 0, openPos = null;
+let view = 'home', m = null, confirmReset = false, lockUntil = 0, openPos = null, confirmSell = null;
 const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const STEP = REDUCED ? 0 : 520;
 const FLASH = 1300;
@@ -455,14 +523,15 @@ function offRisk(a){
   if(a.toZone==='box') r = a.run ? .14 : .18;
   else if(/롱/.test(a.label)) r = .10;
   else return 0;
-  return Math.max(.04, r - (P(a.from).s.pas-60)*.002);
+  return Math.max(.04, r - (P(a.from).s.pas/m.opp.ovr-1)*.12);
 }
 // probability: step 1 = sender, step 2 = receiver (or goalkeeper for shots)
+const eff = (x,o,k) => k*(x-o)/o;   // advantage in percent of the opponent's level
 function probs(a){
-  const me = P(a.from).s, opp = m.opp.ovr + redPen()*100 + tired()*8;
-  if(a.kind==='pass') return [cl(a.b1+(me.pas-60)*.006-(opp-60)*.003), cl(a.b2+(P(a.to).s.ctl-60)*.006-(opp-60)*.003)];
-  if(a.kind==='dribble') return [cl(a.b1+(me[a.stat]-60)*.007-(opp-60)*.004), 1];
-  return [cl(a.b1+(me.sho-60)*.006-(opp-60)*.003), cl(a.b2+(me.sho-60)*.004-(opp-60)*.005)];
+  const me = P(a.from).s, opp = m.opp.ovr * (1 + redPen()*1.7 + tired()*.12);
+  if(a.kind==='pass') return [cl(a.b1+eff(me.pas,opp,.3)), cl(a.b2+eff(P(a.to).s.ctl,opp,.3))];
+  if(a.kind==='dribble') return [cl(a.b1+eff(me[a.stat],opp,.35)), 1];
+  return [cl(a.b1+eff(me.sho,opp,.3)), cl(a.b2+eff(me.sho,opp,.3))];
 }
 
 // ---------- defending: 3 stages (front press -> midfield -> last line) then goalkeeper ----------
@@ -494,9 +563,10 @@ const SHOT_TXT = {'1v1':'상대 공격수가 수비를 벗겨내고 골키퍼와
 const redPen = () => (m && m.reds ? m.reds.length*.05 : 0);
 const avail = p => !(m && m.reds && m.reds.includes(p));
 const pickAvail = list => { const a = list.filter(avail); return a.length ? pick(a) : pick(POS.filter(p=>p!=='GK'&&avail(p))); };
-const defProb = (o,pos) => o.b>=1 ? 1 : cl(o.b+(P(pos).s.def-60)*.007-(m.opp.ovr-60)*.005+(m.defMod||0)-redPen()-tired()*.03-(m.stage==='back'?(m.expose||0):0));
-const saveProb = (o,type) => cl(SHOT_BASE[type]+o.mod[type]+(P('GK').s.gk-60)*.007-(m.opp.ovr-60)*.004);
+const defProb = (o,pos) => o.b>=1 ? 1 : cl(o.b+eff(P(pos).s.def,m.opp.ovr,.38)+(m.defMod||0)-redPen()-tired()*.03-(m.stage==='back'?(m.expose||0):0));
+const saveProb = (o,type) => cl(SHOT_BASE[type]+o.mod[type]+eff(P('GK').s.gk,m.opp.ovr,.35));
 
+const rate = (p,d) => { if(m && m.rt && p) m.rt[p] = (m.rt[p]||0)+d; };
 function say(t,k='info'){ m.turn.push({t,k}); m.log.unshift({t,k,min:Math.min(m.min,90+(m.min>90?m.min-90:0))}); }
 
 function flash(t,k){ if(!m.fq) m.fq=[]; m.fq.push({t,k}); m.flash = REDUCED ? {t,k} : m.fq[0]; }
@@ -533,19 +603,21 @@ function setHolder(pos, zone, line){
   m.situ = line || `${who(pos)}${josa(nm(pos),'이','가')} 공을 잡았습니다.`;
 }
 
-function startMatch(){
-  m = {opp:nextOpp(), us:0, them:0, min:0, half:1, log:[], turn:[], scorers:[], mode:'attack', cards:{}, reds:[], defMod:0, shots:0, oppShots:0};
-  say(`킥오프! ${tn()} 대 ${m.opp.name}.`);
+function startMatch(promo){
+  if(promo && !promoReady()) promo = false;
+  m = {opp:nextOpp(promo), promo:!!promo, rt:{}, goals:{}, lastPass:null, us:0, them:0, min:0, half:1, log:[], turn:[], scorers:[], mode:'attack', cards:{}, reds:[], defMod:0, shots:0, oppShots:0};
+  say(promo ? `승격전 킥오프! ${tn()} 대 ${m.opp.name}. 이기면 승격합니다.` : `킥오프! ${tn()} 대 ${m.opp.name}.`);
   setHolder('LCM','mid',`킥오프 직후, ${who('LCM')}${josa(nm('LCM'),'이','가')} 공을 받았습니다.`);
   view='match'; render();
 }
 
 function oppAttack(from){
+  m.lastPass = null;
   m.min += ri(1,2); m.defMod = 0;
   if(m.run==='overL'||m.run==='overR'){ m.expose=.1; say(`${tag(RUNS[m.run].fb)}${josa(nm(RUNS[m.run].fb),'이','가')} 올라가 있어 수비 뒷공간이 비었습니다!`,'bad'); }
   m.run=null;
   const own = save.team.reduce((a,t)=>a+ovr(t),0)/11;
-  if(R() < cl(.14 + (own-m.opp.ovr)*.006 + tired()*.04, .04, .3)){
+  if(R() < cl(.14 + (own/m.opp.ovr-1)*.36 + tired()*.04, .04, .3)){
     const w = pickAvail([...slots('CDM'),...slots('CM')]);
     say(`${m.opp.name}의 패스 실수! ${tag(w)}${josa(nm(w),'이','가')} 공을 줍습니다.`,'ok');
     flash(`상대의 패스가 흐르며 ${tag(w)}${josa(nm(w),'이','가')} 공을 되찾았습니다!`,'ok');
@@ -564,7 +636,7 @@ function defStage(st){
 
 function card(pos, chance){
   if(R()>=chance) return;
-  m.cards[pos] = (m.cards[pos]||0)+1;
+  m.cards[pos] = (m.cards[pos]||0)+1; rate(pos, m.cards[pos]>=2 ? -1.5 : -.5);
   if(m.cards[pos]>=2){ m.reds.push(pos); say(`${tag(pos)} 경고 누적 퇴장! 남은 경기를 10명으로 뜁니다.`,'them'); }
   else say(`${tag(pos)}에게 옐로카드.`,'bad');
 }
@@ -580,41 +652,43 @@ function doAttack(i){
     m.min += ri(2,3);
     const off = offRisk(a);
     if(off && R()<off){
-      say(`오프사이드! ${tag(a.to)}${josa(nm(a.to),'이','가')} 수비 라인보다 앞서 있었습니다.`,'bad');
+      rate(a.to,-.3); say(`오프사이드! ${tag(a.to)}${josa(nm(a.to),'이','가')} 수비 라인보다 앞서 있었습니다.`,'bad');
       flash('오프사이드!','bad');
       say('상대 프리킥으로 재개합니다.'); oppAttack('att'); return;
     }
     if(R()<p1){
       if(R()<p2){
+        rate(a.from,.05); m.lastPass = {from:a.from, to:a.to};
         say(a.toZone==='air' ? `${tag(a.from)}의 크로스가 정확히 날아갑니다. ${tag(a.to)}${josa(nm(a.to),'이','가')} 공중볼 경합에 뛰어듭니다.`
           : `${tag(a.from)} → ${tag(a.to)}, ${a.label} 성공.`,'ok');
         setHolder(a.to, a.toZone, a.toZone==='air' ? `크로스가 문전으로! ${NOUN[a.to]} ${tag(a.to)}, 선택하세요.` : null);
       } else {
-        const role = lostBall(a, true);
+        const role = lostBall(a, true); rate(a.to,-.25);
         say(pick([`패스는 정확했지만 ${tag(a.to)}의 트래핑이 길어졌고, ${role}가 공을 가로챕니다.`,`좋은 패스였지만 ${tag(a.to)}${josa(nm(a.to),'이','가')} 받기 직전, ${role}가 가로챕니다.`]),'bad');
         flash(`${role}가 ${tag(a.to)}에게 가던 공을 끊었습니다!`,'bad');
         oppAttack(a.toZone);
       }
     } else {
-      const role = lostBall(a, false);
+      const role = lostBall(a, false); rate(a.from,-.3);
       say(`${tag(a.from)}의 ${a.label}, ${role}가 길목에서 끊어냅니다.`,'bad');
       flash(`${tag(a.from)}의 패스를 ${role}가 끊었습니다!`,'bad');
       oppAttack(m.zone);
     }
   } else if(a.kind==='dribble'){
     m.min += ri(1,3);
-    if(R()<p1-tired()*.03){ say(`${tag(a.from)}, ${a.label} 성공! ${ZONE_KO[a.toZone]}${josa(ZONE_KO[a.toZone],'으로','로')} 들어갑니다.`,'ok'); setHolder(a.from, a.toZone); }
-    else { say(`${tag(a.from)}${josa(nm(a.from),'이','가')} ${(()=>{ const role=lostBall(a,false); return role; })()}에게 막혀 공을 빼앗깁니다.`,'bad'); flash(`${tag(a.from)}${josa(nm(a.from),'이','가')} ${m.ev.who}에게 공을 빼앗겼습니다!`,'bad'); oppAttack(m.zone); }
+    if(R()<p1-tired()*.03){ rate(a.from,.2); say(`${tag(a.from)}, ${a.label} 성공! ${ZONE_KO[a.toZone]}${josa(ZONE_KO[a.toZone],'으로','로')} 들어갑니다.`,'ok'); setHolder(a.from, a.toZone); }
+    else { rate(a.from,-.3); say(`${tag(a.from)}${josa(nm(a.from),'이','가')} ${(()=>{ const role=lostBall(a,false); return role; })()}에게 막혀 공을 빼앗깁니다.`,'bad'); flash(`${tag(a.from)}${josa(nm(a.from),'이','가')} ${m.ev.who}에게 공을 빼앗겼습니다!`,'bad'); oppAttack(m.zone); }
   } else {
     m.min += ri(1,2); m.shots++;
     if(R()<p1){
       if(R()<p2){
-        m.us++; m.scorers.push(`${tag(a.from)} ${Math.min(m.min,90)}'`);
+        m.us++; rate(a.from,1.3); if(m.lastPass && m.lastPass.to===a.from && m.lastPass.from!==a.from) rate(m.lastPass.from,.8); m.lastPass = null;
+        m.scorers.push(`${tag(a.from)} ${Math.min(m.min,90)}'`);
         say(`골! ${tag(a.from)}의 ${a.label}이 골망을 흔듭니다!`,'goal');
         say(`${m.opp.name}의 킥오프로 경기가 다시 시작됩니다.`); m.fx={who:tag(a.from), min:Math.min(m.min,90)};
         oppAttack('kick');
       } else { say(`${tag(a.from)}의 ${a.label}, 골키퍼 선방에 막힙니다!`,'bad'); flash('상대 골키퍼의 선방!','bad'); oppAttack('box'); }
-    } else { say(`${tag(a.from)}의 ${a.label}이 골대를 벗어납니다.`,'bad'); flash('슛이 빗나갔습니다.','bad'); oppAttack('box'); }
+    } else { rate(a.from,-.2); say(`${tag(a.from)}의 ${a.label}이 골대를 벗어납니다.`,'bad'); flash('슛이 빗나갔습니다.','bad'); oppAttack('box'); }
   }
 }
 
@@ -622,31 +696,31 @@ function doDefend(i){
   const S = STAGE[m.stage], o = S.opts[i], d = m.cb, j = josa(nm(d),'이','가');
   const p = defProb(o,d); m.defMod = 0; m.min += 1;
   if(o.win==='tactical'){
-    say(`${tag(d)}의 전술적 파울! 상대 역습을 끊습니다.`,'bad'); card(d,.45);
+    rate(d,-.2); say(`${tag(d)}의 전술적 파울! 상대 역습을 끊습니다.`,'bad'); card(d,.45);
     say('상대 프리킥. 그 사이 우리 수비가 자리를 잡습니다.'); m.defMod = .08; defStage('back'); return;
   }
   if(R()<p){
-    if(o.win==='ball'){ say(`${tag(d)}의 ${o.label} 성공! 공을 되찾습니다.`,'ok'); flash(`${tag(d)}${josa(nm(d),'이','가')} 공을 되찾았습니다!`,'ok'); setHolder(d, S.zone); }
-    else if(o.win==='next+'){ say(`${tag(d)}${j} 상대의 속도를 늦춥니다. 다음 수비가 쉬워집니다.`,'ok'); m.defMod = .08; defStage(NEXT[m.stage]); }
-    else { say(`${tag(d)}${j} 끝까지 버텨 슈팅 각을 막습니다.`,'ok'); gkMoment('long'); }
+    if(o.win==='ball'){ rate(d,.7); say(`${tag(d)}의 ${o.label} 성공! 공을 되찾습니다.`,'ok'); flash(`${tag(d)}${josa(nm(d),'이','가')} 공을 되찾았습니다!`,'ok'); setHolder(d, S.zone); }
+    else if(o.win==='next+'){ rate(d,.25); say(`${tag(d)}${j} 상대의 속도를 늦춥니다. 다음 수비가 쉬워집니다.`,'ok'); m.defMod = .08; defStage(NEXT[m.stage]); }
+    else { rate(d,.2); say(`${tag(d)}${j} 끝까지 버텨 슈팅 각을 막습니다.`,'ok'); gkMoment('long'); }
     return;
   }
-  if(o.fail==='next-'){ say(`${tag(d)}${j} 벗겨집니다! 수비 뒷공간이 열립니다.`,'bad'); m.defMod = -.08; defStage(NEXT[m.stage]); }
-  else if(o.fail==='next'){ say(`상대가 ${tag(d)}${josa(nm(d),'을','를')} 지나 전진합니다.`,'bad'); defStage(NEXT[m.stage]); }
-  else if(o.fail==='foul'){ say(`${tag(d)}의 파울. 상대가 프리킥으로 다시 시작합니다.`,'bad'); card(d,.25); defStage(NEXT[m.stage]); }
+  if(o.fail==='next-'){ rate(d,-.35); say(`${tag(d)}${j} 벗겨집니다! 수비 뒷공간이 열립니다.`,'bad'); m.defMod = -.08; defStage(NEXT[m.stage]); }
+  else if(o.fail==='next'){ rate(d,-.25); say(`상대가 ${tag(d)}${josa(nm(d),'을','를')} 지나 전진합니다.`,'bad'); defStage(NEXT[m.stage]); }
+  else if(o.fail==='foul'){ rate(d,-.4); say(`${tag(d)}의 파울. 상대가 프리킥으로 다시 시작합니다.`,'bad'); card(d,.25); defStage(NEXT[m.stage]); }
   else if(o.fail==='foulbox'){
-    if(R()<.3){ say(`${tag(d)}의 태클이 상대 다리에 걸립니다. 페널티킥!`,'them'); card(d,.5); gkMoment('pen'); }
-    else { say(`${tag(d)}의 태클이 빗나갑니다!`,'bad'); gkMoment('1v1'); }
+    if(R()<.3){ rate(d,-.8); say(`${tag(d)}의 태클이 상대 다리에 걸립니다. 페널티킥!`,'them'); card(d,.5); gkMoment('pen'); }
+    else { rate(d,-.5); say(`${tag(d)}의 태클이 빗나갑니다!`,'bad'); gkMoment('1v1'); }
   }
-  else { say(`${tag(d)}${j} 상대에게 벗겨집니다.`,'bad'); gkMoment('normal'); }
+  else { rate(d,-.4); say(`${tag(d)}${j} 상대에게 벗겨집니다.`,'bad'); gkMoment('normal'); }
 }
 
 function doGK(i){
   const o = GK_OPTS[i], type = m.shotType; m.min += 1;
   if(R()<SHOT_MISS[type]){ say(type==='pen'?`상대 키커의 슛이 골대를 벗어납니다!`:`상대의 슛이 골대를 벗어납니다. 골킥.`,'ok'); setHolder('GK','def'); return; }
-  if(R()<saveProb(o,type)){ say(`${tag('GK')}의 선방! 공을 잡아냅니다.`,'ok'); setHolder('GK','def'); }
+  if(R()<saveProb(o,type)){ rate('GK', type==='pen'?1:.7); say(`${tag('GK')}의 선방! 공을 잡아냅니다.`,'ok'); setHolder('GK','def'); }
   else {
-    m.them++; say(`실점. ${m.opp.name}의 골이 들어갑니다.`,'them'); flash('실점했습니다.','bad');
+    m.them++; rate('GK',-.35); say(`실점. ${m.opp.name}의 골이 들어갑니다.`,'them'); flash('실점했습니다.','bad');
     const k = pickAvail([...slots('CM'),...slots('CDM')]);
     setHolder(k,'mid',`우리 팀 킥오프. ${who(k)}${josa(nm(k),'이','가')} 공을 받았습니다.`);
   }
@@ -670,11 +744,24 @@ function secondHalf(){
 }
 function finish(){
   m.mode='end'; m.min=Math.max(90,m.min);
-  const res = m.us>m.them?'w':m.us===m.them?'d':'l';
-  const reward = {w:15,d:9,l:5}[res] + m.us*3;
-  m.res=res; m.reward=reward;
-  save.coins+=reward; save[res]++; save.gf+=m.us; save.ga+=m.them;
-  save.round++; if(save.round>=OPPS.length){ save.round=0; save.season++; m.newSeason=true; }
+  const res = m.us>m.them?'w':m.us===m.them?'d':'l', L = save.league, f = fOf(L);
+  let reward = Math.round(({w:15,d:9,l:5}[res] + m.us*3) * cOf(L) * COIN_K);
+  m.res = res;
+  if(m.promo){
+    if(res==='w'){ reward *= 2; if(L>1){ save.league = L-1; save.lRound = 0; save.cool = 0; m.promoRes = 'up'; } else { save.champ = true; m.promoRes = 'champ'; } }
+    else { save.cool = PROMO_COOL; m.promoRes = 'fail'; }
+  } else { save.lRound++; if(save.cool>0) save.cool--; }
+  m.reward = reward;
+  save.coins += reward; save[res]++; save.gf += m.us; save.ga += m.them;
+  // player ratings for this match (base 6.0), kept for the last 5 matches
+  m.rating = {}; let best = null;
+  for(const t of save.team){ const p = t.pos; let d = m.rt[p]||0;
+    d += res==='w' ? .3 : res==='l' ? -.2 : 0;
+    if(m.them===0){ const r = ROLE[p]; if(r==='GK') d += .5; else if(r==='CB'||r==='FB') d += .3; }
+    const r = Math.max(3, Math.min(10, Math.round((6+d)*10)/10)); m.rating[p] = r;
+    t.hist.push(r); if(t.hist.length>5) t.hist.shift();
+    if(!best || r>m.rating[best]) best = p; }
+  m.mvp = best;
   say('경기 종료.');
   persist();
 }
@@ -804,14 +891,28 @@ function nav(){
   return `<nav class="topnav">
     <button data-go="home" ${view==='home'?'aria-current="page"':''}>홈</button>
     <button data-go="squad" ${view==='squad'?'aria-current="page"':''}>선수단</button>
+    <button data-go="club" ${view==='club'?'aria-current="page"':''}>구단</button>
     <span class="coins">${save.coins} 코인</span></nav>`;
 }
 
+function leaguePanel(){
+  const L = save.league, need = needCV(L), top = L===1, ready = promoReady(), po = nextOpp(true);
+  const line = top && save.champ ? '1부 리그 우승을 달성했습니다! 계속 경기를 즐길 수 있습니다.'
+    : !cvFull() ? `구단 가치를 ${need}까지 채우면 ${top?'우승전':'승격전'}이 열립니다. 구단 화면에서 코인을 투자해 올립니다.`
+    : save.cool>0 ? `${top?'우승전':'승격전'} 재도전까지 일반 경기 ${save.cool}판이 남았습니다.`
+    : `${top?'우승전':'승격전'}이 열렸습니다! 이기면 ${top?'1부 우승':(L-1)+'부 리그로 승격'}입니다.`;
+  return `<section class="panel league">
+    <div class="spread"><span class="eyebrow">${L}부 리그</span><span class="mono muted">구단 가치 ${save.cv} / ${need}</span></div>
+    <div class="bar" role="img" aria-label="구단 가치 ${cvFull()?CV_PER:cvStep()} / ${CV_PER}"><i style="width:${Math.min(100,Math.round(100*cvStep()/CV_PER))}%"></i></div>
+    <span style="font-size:14px">${line}</span>
+    <div class="row">${ready?`<button class="btn" data-act="start-promo">${top?'우승전':'승격전'} · ${esc(po.name)} (능력치 ${po.ovr})</button>`:''}<button class="btn ghost" data-go="club">구단 투자·아이템</button></div>
+  </section>`;
+}
 function renderHome(){
-  const o = nextOpp(); const played = save.w+save.d+save.l;
+  const o = nextOpp(); const played = save.w+save.d+save.l, f = cOf(save.league)*COIN_K;
   return nav() + `
   <header style="display:flex;flex-direction:column;gap:6px">
-    <span class="eyebrow">시즌 ${save.season} · ${save.round+1}라운드 / ${OPPS.length}</span>
+    <span class="eyebrow">${save.league}부 리그 · ${save.lRound+1}번째 경기</span>
     <input id="team-name" class="teamname" data-team="1" value="${esc(tn())}" maxlength="14" aria-label="팀 이름">
     <span class="muted" style="font-size:12px">팀 이름을 눌러서 바꿀 수 있습니다. 선수 이름은 선수단에서 바꿉니다.</span>
     <span class="muted">${FORMS[save.form].name} · 팀 평균 능력치 <span class="mono">${teamOvr()}</span></span>
@@ -821,6 +922,7 @@ function renderHome(){
     <div><span class="muted" style="font-size:12px">득점 · 실점</span><b>${save.gf}:${save.ga}</b></div>
     <div><span class="muted" style="font-size:12px">코인</span><b style="color:var(--gold)">${save.coins}</b></div>
   </div>
+  ${leaguePanel()}
   <section class="panel" style="display:flex;flex-direction:column;gap:12px">
     <div class="spread"><span class="eyebrow">다음 상대</span><span class="mono muted">능력치 ${o.ovr}</span></div>
     <h2 style="font-size:21px">${esc(o.name)}</h2>
@@ -831,7 +933,8 @@ function renderHome(){
     <span class="eyebrow">규칙</span>
     <span>패스는 두 번 판정합니다. 보내는 선수의 패스로 한 번, 받는 선수의 볼 컨트롤로 한 번입니다. 버튼 오른쪽 숫자는 두 판정을 합친 성공 확률입니다.</span>
     <span>공을 뺏기면 수비가 시작됩니다. 공격수의 전방 압박, 미드필더의 중원 수비, 수비수의 최종 수비, 골키퍼 순서로 막습니다. 파울을 하면 경고를 받을 수 있고, 경고 두 장이면 퇴장입니다.</span>
-    <span>승리 15 · 무승부 9 · 패배 5 코인, 골마다 3 코인을 더 받습니다.</span>
+    <span>승리 ${Math.round(15*f)} · 무승부 ${Math.round(9*f)} · 패배 ${Math.round(5*f)} 코인, 골마다 ${Math.round(3*f)} 코인을 더 받습니다. 리그가 오를수록 상대도 보상도 커집니다.</span>
+    <span>능력치에는 상한이 없습니다. 성공 확률은 내 능력치와 상대 능력치의 차이로 정해지고, 최대 95%입니다.</span>
     ${played ? '' : '<span>기록은 이 브라우저에 저장됩니다.</span>'}
     <details class="savecode"><summary>다른 기기로 옮기기 (저장 코드)</summary>
       <span>이 코드를 복사해 두었다가 다른 폰이나 컴퓨터에서 붙여 넣으면 내 팀을 그대로 이어서 할 수 있습니다.</span>
@@ -846,6 +949,25 @@ function renderHome(){
   </section>`;
 }
 
+function renderClub(){
+  const L = save.league, tierNow = 10-L, full = cvFull(), top = L===1;
+  const invest = full ? `<span class="muted" style="font-size:13px">${top&&save.champ?'1부 우승까지 마쳤습니다. 남은 코인으로 아이템을 구매해 보세요.':`구단 가치가 가득 찼습니다. 홈에서 ${top?'우승전':'승격전'}에 도전하세요.`}</span>`
+    : `<button class="btn" data-act="invest" ${save.coins<cvCost()?'disabled':''}>구단에 투자 · ${cvCost()}코인</button><span class="muted" style="font-size:12px">투자할 때마다 구단 가치가 1 오르고 다음 투자 비용이 25%씩 커집니다.</span>`;
+  const shown = ITEMS.filter(it=>it.tier<=tierNow+1);
+  const tiers = [...new Set(shown.map(it=>it.tier))];
+  return nav() + `
+  <header style="display:flex;flex-direction:column;gap:6px"><h1>구단</h1>
+    <span class="muted" style="font-size:13px">구단 가치를 올리면 새 아이템이 열립니다. 아이템은 한 번 사면 선수들의 능력치를 한꺼번에 올려 줍니다. 일반 육성보다 효율이 좋습니다.</span></header>
+  <section class="panel league">
+    <div class="spread"><span class="eyebrow">${L}부 리그</span><span class="mono muted">구단 가치 ${save.cv} / ${needCV(L)}</span></div>
+    <div class="bar"><i style="width:${Math.min(100,Math.round(100*cvStep()/CV_PER))}%"></i></div>${invest}
+    ${discCount()?`<span class="muted" style="font-size:12px">육성비 할인 적용 중: -${Math.min(50,discCount()*10)}%</span>`:''}
+  </section>` + tiers.map(t=>`<section class="items"><span class="eyebrow">${10-t}부 리그 아이템</span>${shown.filter(it=>it.tier===t).map(it=>{
+      const own = !!save.items[it.id], lock = save.cv<it.unlock;
+      return `<article class="itm ${own?'own':''} ${lock?'lock':''}"><div><b>${esc(it.name)}</b><span class="muted">${esc(it.desc)}</span></div>
+        ${own?'<span class="tagown">구매 완료</span>':lock?`<span class="muted" style="font-size:12px">구단 가치 ${it.unlock} 필요</span>`
+        :`<button class="btn ghost small" data-item="${it.id}" ${save.coins<it.cost?'disabled':''}>${it.cost}코인</button>`}</article>`; }).join('')}</section>`).join('');
+}
 function formPicker(){
   const lock = !!(m && m.mode!=='end');
   return `<section class="formpick"><span class="eyebrow">포메이션</span>
@@ -868,14 +990,18 @@ function renderSquad(){
     return `<article class="pl ${open?'open':''}" id="card-${p}">
       <button class="pl-toggle" data-open="${p}" aria-expanded="${open}" aria-controls="body-${p}">
         <span class="badge">${CODE[p]}</span>
-        <span class="pl-sum"><b>${esc(t.name)}</b><span>${key.map(k=>`${SK[k]} ${t.s[k]}`).join(' · ')}</span></span>
+        <span class="pl-sum"><b>${esc(t.name)}${t.gen>1?` <span class="gen">${t.gen}기</span>`:''}</b><span>${key.map(k=>`${SK[k]} ${t.s[k]}`).join(' · ')}</span></span>
         <span class="ovr"><small>OVR</small>${ovr(t)}</span><span class="chev" aria-hidden="true">${open?'▴':'▾'}</span></button>
       ${open?`<div class="pl-body" id="body-${p}">
       <label class="rename">이름 <input id="name-${p}" data-name="${p}" value="${esc(t.name)}" maxlength="8" aria-label="${POS_KO[p]} 이름"></label>
       <div class="sgrid">${order.map(k=>{ const v=t.s[k], c=cost(v);
         return `<div class="st ${key.includes(k)?'key':''}" id="st-${p}-${k}"><span class="n">${SK[k]}</span>
           <span class="row" style="gap:6px;flex-wrap:nowrap"><span class="v">${v}</span>
-          <button class="up" data-up="${p}:${k}" ${save.coins<c||v>=99?'disabled':''} aria-label="${SK[k]} 올리기, ${c}코인">▲ ${c}코인</button></span></div>`; }).join('')}</div></div>`:''}
+          <button class="up" data-up="${p}:${k}" ${save.coins<c?'disabled':''} aria-label="${SK[k]} 올리기, ${c}코인">▲ ${c}코인</button></span></div>`; }).join('')}</div>
+      <div class="sell"><span class="muted" style="font-size:13px">최근 평점 ${t.hist.length?ratingAvg(t).toFixed(1)+' (최근 '+t.hist.length+'경기)':'기록 없음'} · 몸값 <b class="mono" style="color:var(--gold)">${salePrice(t)}코인</b></span>
+        ${confirmSell===p?`<span style="font-size:13px">정말 판매할까요? ${salePrice(t)}코인을 받고 ${esc(t.name)} 선수는 능력치가 초기화된 ${(t.gen||1)+1}기 신인이 됩니다. <button class="link" data-sell-yes="${p}" style="color:var(--danger)">판매</button> <button class="link" data-sell-no="1">취소</button></span>`
+        :`<button class="btn ghost small" data-sell="${p}">판매하고 신인으로 초기화</button>`}
+        <span class="muted" style="font-size:12px">몸값은 이 선수에게 쓴 육성 코인의 55~100%이며, 최근 5경기 평점이 높을수록 올라갑니다. 아이템으로 오른 능력치는 몸값에 들어가지 않습니다.</span></div></div>`:''}
     </article>`; }).join('')}
   </section>`).join('') + `</div></div>`;
 }
@@ -905,7 +1031,11 @@ function renderMatch(){
       <span class="big">${m.us} : ${m.them}</span>
       <span class="muted" style="font-size:13px">${m.scorers.length?'득점: '+esc(m.scorers.join(', ')):'득점 없음'} · 슈팅 ${m.shots} 대 ${m.oppShots}</span>
       <span class="reward">+${m.reward} 코인</span>
-      ${m.newSeason?`<span style="font-size:13px">시즌을 마쳤습니다. 다음 시즌은 상대가 더 강해집니다.</span>`:''}
+      ${m.promoRes==='up'?`<span class="promo up">승격! ${save.league}부 리그로 올라갑니다. 상대가 더 강해지고 보상도 커집니다.</span>`
+        :m.promoRes==='champ'?`<span class="promo up">1부 리그 우승! 별무리 FC가 정상에 올랐습니다. 축하합니다. 엔딩입니다. 계속 경기를 이어 갈 수 있습니다.</span>`
+        :m.promoRes==='fail'?`<span class="promo down">승격전에서 이기지 못했습니다. 일반 경기 ${PROMO_COOL}판을 치른 뒤 다시 도전할 수 있습니다.</span>`:''}
+      <span class="muted" style="font-size:13px">최우수 선수 ${esc(tag(m.mvp))} 평점 ${m.rating[m.mvp].toFixed(1)}</span>
+      <details class="ratings"><summary>선수 평점</summary><ol>${save.team.slice().sort((a,b)=>m.rating[b.pos]-m.rating[a.pos]).map(t=>`<li><span>${esc(tag(t.pos))}</span><b class="mono">${m.rating[t.pos].toFixed(1)}</b></li>`).join('')}</ol></details>
       <div class="row" style="justify-content:center"><button class="btn" data-go="squad">선수 육성하기</button><button class="btn ghost" data-go="home">홈으로</button></div>
     </section>` + logHtml(true);
   }
@@ -950,9 +1080,9 @@ function logHtml(open){
 }
 
 function render(){
-  app.className = view==='home' ? '' : view==='match' ? 'wide fit' : 'wide';
+  app.className = (view==='home'||view==='club') ? '' : view==='match' ? 'wide fit' : 'wide';
   document.body.classList.toggle('fitbody', view==='match');
-  app.innerHTML = view==='home'?renderHome():view==='squad'?renderSquad():renderMatch();
+  app.innerHTML = view==='home'?renderHome():view==='squad'?renderSquad():view==='club'?renderClub():renderMatch();
   animateField();
 }
 function jumpTo(p){ openPos=p; render(); const el=document.getElementById('card-'+p); if(!el) return; el.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'center'}); el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); }
@@ -974,11 +1104,17 @@ app.addEventListener('click', e=>{
       if((m.flash||m.fx)&&STEP) setTimeout(()=>{ const fl=document.querySelector('.flashline'), nx=document.getElementById('next-situ'); if(fl) fl.remove(); if(nx) nx.hidden=false; }, wait);
       if(m.us+m.them!==before){ const sc=document.querySelector('.sc'); if(sc) sc.classList.add('pop'); } }, REDUCED?0:420);
     return; }
+  if(b.dataset.item){ if(buyItem(b.dataset.item)){ const y=window.scrollY; render(); window.scrollTo(0,y); } return; }
+  if(b.dataset.sell){ confirmSell=b.dataset.sell; const y=window.scrollY; render(); window.scrollTo(0,y); return; }
+  if(b.dataset.sellYes){ sell(b.dataset.sellYes); confirmSell=null; const y=window.scrollY; render(); window.scrollTo(0,y); return; }
+  if(b.dataset.sellNo){ confirmSell=null; const y=window.scrollY; render(); window.scrollTo(0,y); return; }
   if(b.dataset.up){ const [p,k]=b.dataset.up.split(':'); const t=P(p), c=cost(t.s[k]);
-    if(save.coins>=c && t.s[k]<99){ save.coins-=c; t.s[k]++; persist(); const y=window.scrollY; render(); window.scrollTo(0,y);
+    if(upgrade(p,k)){ const y=window.scrollY; render(); window.scrollTo(0,y);
       const el=document.getElementById(`st-${p}-${k}`); if(el) el.classList.add('bump'); } return; }
   const act=b.dataset.act;
   if(act==='start') startMatch();
+  if(act==='start-promo') startMatch(true);
+  if(act==='invest'){ if(investCV()){ const y=window.scrollY; render(); window.scrollTo(0,y); } return; }
   if(act==='second-half' && m && m.mode==='half' && Date.now()>=lockUntil) secondHalf();
   if(act==='reset'){ confirmReset=true; render(); }
   if(act==='copy'){ const t=document.getElementById('save-code'), msg=document.getElementById('code-msg');

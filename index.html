@@ -471,7 +471,8 @@ function actionsFor(pos, zone){
       pass('수비형 미드필더에게 짧은 패스',A('CDM',s),'mid',.93,.90),
       pass('옆 풀백에게 패스',A('FB',s),'def',.95,.92),
       pass('반대편 윙어에게 대각 롱패스',A('W',o),'att',.72,.68),
-      pass('골키퍼에게 백패스','GK','def',.97,.96)];
+      pass('골키퍼에게 백패스','GK','def',.97,.96),
+      ...(zone==='def' ? [drib('압박을 뚫고 볼을 몰고 전진','mid',.56)] : [])];
     case 'FB': return zone==='att' ? [
       pass('문전으로 크로스',A('ST',s),'air',.60,.56),
       pass('윙어와 2대1 패스',A('W',s),'box',.80,.78),
@@ -492,6 +493,7 @@ function actionsFor(pos, zone){
       shot('중거리 슛',.46,.32),
       pass('수비형 미드필더에게 백패스',A('CDM',s),'mid',.94,.92)] : [
       pass('윙어에게 찔러주기',A('W',s),'att',.78,.74),
+      pass('반대편 윙어에게 대각 전환 패스',A('W',o),'att',.70,.68),
       pass('사이드 풀백에게 패스',A('FB',s),'mid',.92,.90),
       pass('센터백에게 백패스',A('CB',s),'def',.95,.93),
       drib('직접 드리블로 전진','att',.66)];
@@ -500,6 +502,7 @@ function actionsFor(pos, zone){
       pass('스트라이커에게 컷백',A('ST',s),'box',.84,.80),
       pass('중앙 미드필더에게 빼주기',A('CM',s),'att',.90,.88)] : [
       drib('1대1 드리블 돌파','box',.64),
+      pass('안쪽으로 파고들며 침투 패스',A('ST',s),'box',.64,.62),
       pass('문전으로 크로스',A('ST',s),'air',.60,.55),
       shot('컷인 후 감아차기',.52,.40),
       pass('중앙 미드필더에게 백패스',A('CM',s),'mid',.92,.90)];
@@ -533,9 +536,10 @@ function offRisk(a){
 const eff = (x,o,k) => k*(x-o)/o;   // advantage in percent of the opponent's level
 function probs(a){
   const me = P(a.from).s, opp = m.opp.ovr * (1 + redPen()*1.7 + tired()*.12);
-  if(a.kind==='pass') return [cl(a.b1+eff(me.pas,opp,.3)), cl(a.b2+eff(P(a.to).s.ctl,opp,.3))];
-  if(a.kind==='dribble') return [cl(a.b1+eff(me[a.stat],opp,.35)), 1];
-  return [cl(a.b1+eff(me.sho,opp,.3)), cl(a.b2+eff(me.sho,opp,.3))];
+  const mo = m.mood || {};
+  if(a.kind==='pass') return [cl(a.b1+eff(me.pas,opp,.3)+(mo.pass||0)), cl(a.b2+eff(P(a.to).s.ctl,opp,.3))];
+  if(a.kind==='dribble') return [cl(a.b1+eff(me[a.stat],opp,.35)-(m.dribStreak||0)*.08+(mo.dri||0)), 1];
+  return [cl(a.b1+eff(me.sho,opp,.3)+(mo.sho||0)), cl(a.b2+eff(me.sho,opp,.3))];
 }
 
 // ---------- defending: 3 stages (front press -> midfield -> last line) then goalkeeper ----------
@@ -567,7 +571,7 @@ const SHOT_TXT = {'1v1':'상대 공격수가 수비를 벗겨내고 골키퍼와
 const redPen = () => (m && m.reds ? m.reds.length*.05 : 0);
 const avail = p => !(m && m.reds && m.reds.includes(p));
 const pickAvail = list => { const a = list.filter(avail); return a.length ? pick(a) : pick(POS.filter(p=>p!=='GK'&&avail(p))); };
-const defProb = (o,pos) => o.b>=1 ? 1 : cl(o.b+eff(P(pos).s.def,m.opp.ovr,.38)+(m.defMod||0)-redPen()-tired()*.03-(m.stage==='back'?(m.expose||0):0));
+const defProb = (o,pos) => o.b>=1 ? 1 : cl(o.b+eff(P(pos).s.def,m.opp.ovr,.38)-((m.cards&&m.cards[pos]===1)?.05:0)+(m.defMod||0)-redPen()-tired()*.03-(m.stage==='back'?(m.expose||0):0));
 const saveProb = (o,type) => cl(SHOT_BASE[type]+o.mod[type]+eff(P('GK').s.gk,m.opp.ovr,.35));
 
 const rate = (p,d) => { if(m && m.rt && p) m.rt[p] = (m.rt[p]||0)+d; };
@@ -616,14 +620,14 @@ function startMatch(promo){
 }
 
 function oppAttack(from){
-  m.lastPass = null;
+  m.lastPass = null; m.dribStreak = 0;
   m.min += ri(1,2); m.defMod = 0;
   if(m.run==='overL'||m.run==='overR'){ m.expose=.1; say(`${tag(RUNS[m.run].fb)}${josa(nm(RUNS[m.run].fb),'이','가')} 올라가 있어 수비 뒷공간이 비었습니다!`,'bad'); }
   m.run=null;
   const own = save.team.reduce((a,t)=>a+ovr(t),0)/11;
   if(R() < cl(.14 + (own/m.opp.ovr-1)*.36 + tired()*.04, .04, .3)){
     const w = pickAvail([...slots('CDM'),...slots('CM')]);
-    say(`${m.opp.name}의 패스 실수! ${tag(w)}${josa(nm(w),'이','가')} 공을 줍습니다.`,'ok');
+    say(pick([`${m.opp.name}의 패스 실수! ${tag(w)}${josa(nm(w),'이','가')} 공을 줍습니다.`,`${m.opp.name}의 빌드업이 흔들립니다. ${tag(w)}${josa(nm(w),'이','가')} 공을 가로챕니다.`,`상대의 볼 터치가 길어졌습니다. ${tag(w)}${josa(nm(w),'이','가')} 놓치지 않습니다.`]),'ok');
     flash(`상대의 패스가 흐르며 ${tag(w)}${josa(nm(w),'이','가')} 공을 되찾았습니다!`,'ok');
     setHolder(w,'mid'); return;
   }
@@ -642,7 +646,7 @@ function card(pos, chance){
   if(R()>=chance) return;
   m.cards[pos] = (m.cards[pos]||0)+1; rate(pos, m.cards[pos]>=2 ? -1.5 : -.5);
   if(m.cards[pos]>=2){ m.reds.push(pos); say(`${tag(pos)} 경고 누적 퇴장! 남은 경기를 10명으로 뜁니다.`,'them'); }
-  else say(`${tag(pos)}에게 옐로카드.`,'bad');
+  else say(pick([`${tag(pos)}에게 옐로카드.`,`심판이 ${tag(pos)}에게 옐로카드를 꺼냅니다.`,`${tag(pos)}, 경고를 받습니다. 이제 조심해야 합니다.`]),'bad');
 }
 
 function gkMoment(type){
@@ -650,8 +654,22 @@ function gkMoment(type){
   m.situ = `${SHOT_TXT[type]} ${tag('GK')}, 어떻게 막을까요?`;
 }
 
+// after a turnover the ball is sometimes still loose: a midfielder can win the second ball
+function looseBall(){
+  if(R()>=.14) return false;
+  const w = pickAvail([...slots('CDM'),...slots('CM')]);
+  say(pick([`공이 흘렀습니다! ${tag(w)}${josa(nm(w),'이','가')} 세컨볼을 따냅니다.`,`혼전 속에서 ${tag(w)}${josa(nm(w),'이','가')} 공을 먼저 잡았습니다.`]),'ok');
+  flash(`세컨볼 경합! ${tag(w)}${josa(nm(w),'이','가')} 되찾았습니다!`,'ok');
+  rate(w,.3); setHolder(w,'mid'); return true;
+}
+// short-lived match events that tilt the next few decisions
+const MOODS = [
+  () => ({name:'관중 함성', say:'관중석이 들썩입니다! 한동안 패스가 더 잘 맞습니다. (패스 +4%)', pass:.04, left:3}),
+  () => ({name:'상대 수비 집중력 저하', say:'상대 수비가 지쳐 보입니다. 슈팅 기회를 노려 보세요. (슈팅 +5%)', sho:.05, left:3}),
+  () => ({name:'미끄러운 그라운드', say:'비가 내려 그라운드가 미끄럽습니다. 드리블과 패스가 어려워집니다. (드리블 -8%, 패스 -3%)', dri:-.08, pass:-.03, left:3})];
 function doAttack(i){
   const a = m.actions[i]; const [p1,p2] = probs(a);
+  if(a.kind!=='dribble') m.dribStreak = 0;
   if(a.kind==='pass'){
     m.min += ri(2,3);
     const off = offRisk(a);
@@ -663,36 +681,42 @@ function doAttack(i){
     if(R()<p1){
       if(R()<p2){
         rate(a.from,.05); m.lastPass = {from:a.from, to:a.to};
-        say(a.toZone==='air' ? `${tag(a.from)}의 크로스가 정확히 날아갑니다. ${tag(a.to)}${josa(nm(a.to),'이','가')} 공중볼 경합에 뛰어듭니다.`
-          : `${tag(a.from)} → ${tag(a.to)}, ${a.label} 성공.`,'ok');
+        say(a.toZone==='air' ? pick([`${tag(a.from)}의 크로스가 정확히 날아갑니다. ${tag(a.to)}${josa(nm(a.to),'이','가')} 공중볼 경합에 뛰어듭니다.`,`${tag(a.from)}${josa(nm(a.from),'이','가')} 올려 준 공이 문전으로 휘어 들어갑니다. ${tag(a.to)}${josa(nm(a.to),'이','가')} 머리를 들이밉니다.`])
+          : pick([`${tag(a.from)} → ${tag(a.to)}, ${a.label} 성공.`,
+              `${tag(a.from)}의 ${a.label}, ${tag(a.to)}${josa(nm(a.to),'이','가')} 깔끔하게 받아냅니다.`,
+              `${a.label}! 공이 ${tag(a.to)}의 발밑으로 정확히 들어갑니다.`,
+              `${tag(a.from)}${josa(nm(a.from),'이','가')} 고개를 들어 ${tag(a.to)}에게 연결합니다.`]),'ok');
         setHolder(a.to, a.toZone, a.toZone==='air' ? `크로스가 문전으로! ${NOUN[a.to]} ${tag(a.to)}, 선택하세요.` : null);
       } else {
         const role = lostBall(a, true); rate(a.to,-.25);
-        say(pick([`패스는 정확했지만 ${tag(a.to)}의 트래핑이 길어졌고, ${role}가 공을 가로챕니다.`,`좋은 패스였지만 ${tag(a.to)}${josa(nm(a.to),'이','가')} 받기 직전, ${role}가 가로챕니다.`]),'bad');
+        say(pick([`패스는 정확했지만 ${tag(a.to)}의 트래핑이 길어졌고, ${role}가 공을 가로챕니다.`,`좋은 패스였지만 ${tag(a.to)}${josa(nm(a.to),'이','가')} 받기 직전, ${role}가 가로챕니다.`,`${tag(a.to)}${josa(nm(a.to),'이','가')} 공을 받으러 나오는 사이 ${role}가 먼저 몸을 밀어 넣습니다.`]),'bad');
         flash(`${role}가 ${tag(a.to)}에게 가던 공을 끊었습니다!`,'bad');
+        if(looseBall()) return;
         oppAttack(a.toZone);
       }
     } else {
       const role = lostBall(a, false); rate(a.from,-.3);
-      say(`${tag(a.from)}의 ${a.label}, ${role}가 길목에서 끊어냅니다.`,'bad');
+      say(pick([`${tag(a.from)}의 ${a.label}, ${role}가 길목에서 끊어냅니다.`,`${tag(a.from)}의 패스가 짧았습니다. ${role}가 발을 뻗어 걷어냅니다.`,`${role}가 패스 길을 읽고 있었습니다. ${tag(a.from)}의 공이 끊깁니다.`]),'bad');
       flash(`${tag(a.from)}의 패스를 ${role}가 끊었습니다!`,'bad');
+      if(looseBall()) return;
       oppAttack(m.zone);
     }
   } else if(a.kind==='dribble'){
     m.min += ri(1,3);
-    if(R()<p1-tired()*.03){ rate(a.from,.2); say(`${tag(a.from)}, ${a.label} 성공! ${ZONE_KO[a.toZone]}${josa(ZONE_KO[a.toZone],'으로','로')} 들어갑니다.`,'ok'); setHolder(a.from, a.toZone); }
-    else { rate(a.from,-.3); say(`${tag(a.from)}${josa(nm(a.from),'이','가')} ${(()=>{ const role=lostBall(a,false); return role; })()}에게 막혀 공을 빼앗깁니다.`,'bad'); flash(`${tag(a.from)}${josa(nm(a.from),'이','가')} ${m.ev.who}에게 공을 빼앗겼습니다!`,'bad'); oppAttack(m.zone); }
+    if(R()<p1-tired()*.03){ rate(a.from,.2); m.dribStreak = (m.dribStreak||0)+1; const zk = ZONE_KO[a.toZone], zj = josa(zk,'으로','로');
+      say(pick([`${tag(a.from)}, ${a.label} 성공! ${zk}${zj} 들어갑니다.`,`${tag(a.from)}${josa(nm(a.from),'이','가')} 수비를 제치고 ${zk}${zj} 치고 들어갑니다.`,`${a.label}! ${tag(a.from)}의 몸놀림에 수비가 따라가지 못합니다.`]),'ok'); setHolder(a.from, a.toZone); }
+    else { m.expose = .06; rate(a.from,-.3); say(`${tag(a.from)}${josa(nm(a.from),'이','가')} ${(()=>{ const role=lostBall(a,false); return role; })()}에게 막혀 공을 빼앗깁니다.`,'bad'); flash(`${tag(a.from)}${josa(nm(a.from),'이','가')} ${m.ev.who}에게 공을 빼앗겼습니다!`,'bad'); oppAttack(m.zone); }
   } else {
     m.min += ri(1,2); m.shots++;
     if(R()<p1){
       if(R()<p2){
         m.us++; rate(a.from,1.3); if(m.lastPass && m.lastPass.to===a.from && m.lastPass.from!==a.from) rate(m.lastPass.from,.8); m.lastPass = null;
         m.scorers.push(`${tag(a.from)} ${Math.min(m.min,90)}'`);
-        say(`골! ${tag(a.from)}의 ${a.label}이 골망을 흔듭니다!`,'goal');
+        say(pick([`골! ${tag(a.from)}의 ${a.label}${josa(a.label,'이','가')} 골망을 흔듭니다!`,`골! ${a.label}, 골키퍼가 손쓸 틈이 없습니다! ${tag(a.from)}`,`${tag(a.from)}, 해냅니다! ${a.label}${josa(a.label,'이','가')} 그대로 골문 안으로!`,`골인! ${tag(a.from)}의 ${a.label}${josa(a.label,'이','가')} 구석에 꽂힙니다!`]),'goal');
         say(`${m.opp.name}의 킥오프로 경기가 다시 시작됩니다.`); m.fx={who:tag(a.from), min:Math.min(m.min,90)};
         oppAttack('kick');
-      } else { say(`${tag(a.from)}의 ${a.label}, 골키퍼 선방에 막힙니다!`,'bad'); flash('상대 골키퍼의 선방!','bad'); oppAttack('box'); }
-    } else { rate(a.from,-.2); say(`${tag(a.from)}의 ${a.label}이 골대를 벗어납니다.`,'bad'); flash('슛이 빗나갔습니다.','bad'); oppAttack('box'); }
+      } else { say(pick([`${tag(a.from)}의 ${a.label}, 골키퍼 선방에 막힙니다!`,`${tag(a.from)}의 ${a.label}! 하지만 상대 골키퍼가 몸을 날려 쳐냅니다.`,`골문 구석을 노린 ${a.label}, 골키퍼 손끝에 걸립니다.`]),'bad'); flash('상대 골키퍼의 선방!','bad'); oppAttack('box'); }
+    } else { rate(a.from,-.2); say(pick([`${tag(a.from)}의 ${a.label}${josa(a.label,'이','가')} 골대를 벗어납니다.`,`${tag(a.from)}의 ${a.label}, 공이 골대 위로 떠오릅니다.`,`${tag(a.from)}의 ${a.label}${josa(a.label,'이','가')} 크로스바를 넘어갑니다.`]),'bad'); flash('슛이 빗나갔습니다.','bad'); oppAttack('box'); }
   }
 }
 
@@ -700,13 +724,16 @@ function doDefend(i){
   const S = STAGE[m.stage], o = S.opts[i], d = m.cb, j = josa(nm(d),'이','가');
   const p = defProb(o,d); m.defMod = 0; m.min += 1;
   if(o.win==='tactical'){
-    rate(d,-.2); say(`${tag(d)}의 전술적 파울! 상대 역습을 끊습니다.`,'bad'); card(d,.45);
-    say('상대 프리킥. 그 사이 우리 수비가 자리를 잡습니다.'); m.defMod = .08; defStage('back'); return;
+    rate(d,-.2); say(pick([`${tag(d)}의 전술적 파울! 상대 역습을 끊습니다.`,`${tag(d)}${josa(nm(d),'이','가')} 유니폼을 잡아당겨 속도를 늦춥니다. 파울입니다.`]),'bad'); card(d,.55);
+    if(R()<.3){ say('우리 박스 근처에서 내준 프리킥입니다. 상대가 직접 슛을 노립니다!','bad'); m.defMod = 0; gkMoment('long'); return; }
+    say(pick(['상대 프리킥. 그 사이 우리 수비가 자리를 잡습니다.','심판이 휘슬을 붑니다. 수비수들이 재빨리 라인을 맞춥니다.','프리킥이 선언되고 우리 수비가 벽을 세웁니다.'])); m.defMod = .05; defStage('back'); return;
   }
   if(R()<p){
-    if(o.win==='ball'){ rate(d,.7); say(`${tag(d)}의 ${o.label} 성공! 공을 되찾습니다.`,'ok'); flash(`${tag(d)}${josa(nm(d),'이','가')} 공을 되찾았습니다!`,'ok'); setHolder(d, S.zone); }
-    else if(o.win==='next+'){ rate(d,.25); say(`${tag(d)}${j} 상대의 속도를 늦춥니다. 다음 수비가 쉬워집니다.`,'ok'); m.defMod = .08; defStage(NEXT[m.stage]); }
-    else { rate(d,.2); say(`${tag(d)}${j} 끝까지 버텨 슈팅 각을 막습니다.`,'ok'); gkMoment('long'); }
+    if(o.win==='ball'){ rate(d,.7); say(pick([`${tag(d)}의 ${o.label} 성공! 공을 되찾습니다.`,`${tag(d)}, 타이밍이 완벽했습니다! 공을 되찾습니다.`,`${tag(d)}${josa(nm(d),'이','가')} 공을 걷어내고 그대로 잡아챕니다.`]),'ok'); flash(`${tag(d)}${josa(nm(d),'이','가')} 공을 되찾았습니다!`,'ok'); setHolder(d, S.zone); }
+    else if(o.win==='next+'){
+      if(R()<.3){ rate(d,.5); say(`${tag(d)}${j} 시간을 끄는 사이 상대의 패스가 길어집니다. 공을 되찾습니다!`,'ok'); flash(`지연 수비가 통했습니다! ${tag(d)}${josa(nm(d),'이','가')} 공을 잡았습니다.`,'ok'); setHolder(d, S.zone); return; }
+      rate(d,.25); say(pick([`${tag(d)}${j} 상대의 속도를 늦춥니다. 다음 수비가 쉬워집니다.`,`${tag(d)}${j} 길목을 막아 상대가 공을 돌립니다. 수비가 정비됩니다.`]),'ok'); m.defMod = .08; defStage(NEXT[m.stage]); }
+    else { rate(d,.2); say(pick([`${tag(d)}${j} 끝까지 버텨 슈팅 각을 막습니다.`,`${tag(d)}의 끈질긴 수비에 상대가 급하게 중거리 슛을 시도합니다.`,`${tag(d)}${j} 몸을 던져 정면을 막아서자 상대가 먼 거리에서 슛을 때립니다.`]),'ok'); gkMoment('long'); }
     return;
   }
   if(o.fail==='next-'){ rate(d,-.35); say(`${tag(d)}${j} 벗겨집니다! 수비 뒷공간이 열립니다.`,'bad'); m.defMod = -.08; defStage(NEXT[m.stage]); }
@@ -721,8 +748,11 @@ function doDefend(i){
 
 function doGK(i){
   const o = GK_OPTS[i], type = m.shotType; m.min += 1;
-  if(R()<SHOT_MISS[type]){ say(type==='pen'?`상대 키커의 슛이 골대를 벗어납니다!`:`상대의 슛이 골대를 벗어납니다. 골킥.`,'ok'); setHolder('GK','def'); return; }
-  if(R()<saveProb(o,type)){ rate('GK', type==='pen'?1:.7); say(`${tag('GK')}의 선방! 공을 잡아냅니다.`,'ok'); setHolder('GK','def'); }
+  if(R()<SHOT_MISS[type]){ say(type==='pen'?pick([`상대 키커의 슛이 골대를 벗어납니다!`,`상대 키커가 하늘 높이 차 버립니다! 페널티킥을 놓칩니다!`]):pick([`상대의 슛이 골대를 벗어납니다. 골킥.`,`상대의 슛이 골대 옆으로 빗나갑니다.`,`상대의 급한 슛이 크로스바 위로 넘어갑니다. 골킥.`]),'ok'); setHolder('GK','def'); return; }
+  if(R()<saveProb(o,type)){ rate('GK', type==='pen'?1:.7);
+    say(type==='pen' ? pick([`${tag('GK')}, 방향을 읽었습니다! 페널티킥을 막아냅니다!`,`${tag('GK')}의 슈퍼 세이브! 페널티킥이 막혔습니다!`])
+      : type==='1v1' ? pick([`${tag('GK')}${josa(nm('GK'),'이','가')} 각도를 좁히고 발끝으로 막아냅니다!`,`${tag('GK')}, 1대1을 이겨 냅니다!`])
+      : pick([`${tag('GK')}의 선방! 공을 잡아냅니다.`,`${tag('GK')}${josa(nm('GK'),'이','가')} 몸을 날려 공을 쳐냅니다.`,`정면으로 온 슛을 ${tag('GK')}${josa(nm('GK'),'이','가')} 안정적으로 잡아냅니다.`,`${tag('GK')}의 손끝이 공을 골대 밖으로 밀어냅니다.`]),'ok'); setHolder('GK','def'); }
   else {
     m.them++; rate('GK',-.35); say(`실점. ${m.opp.name}의 골이 들어갑니다.`,'them'); flash('실점했습니다.','bad');
     const k = pickAvail([...slots('CM'),...slots('CDM')]);
@@ -733,6 +763,8 @@ function doGK(i){
 function choose(i){
   m.turn = []; m.flash = null; m.fq = []; m.ev = null; m.fx = null; confirmReset=false;
   if(m.mode==='attack') doAttack(i); else if(m.mode==='defend') doDefend(i); else if(m.mode==='gk') doGK(i);
+  if(m.mood){ if(--m.mood.left<=0) m.mood = null; }
+  else if(m.mode==='attack' && R()<.07){ m.mood = pick(MOODS)(); say(m.mood.say,'info'); }
   if(m.mode==='attack' || m.mode==='defend'){
     if(m.half===1 && m.min>=45){
       m.min=45; say(`전반 종료 휘슬. ${m.us}:${m.them}로 전반을 마칩니다.`); m.mode='half';
@@ -811,6 +843,18 @@ function formation(){
       else { const cm = side==='L'?'RCM':'LCM'; if(ROLE[cm]==='CM') out[cm]=[cm==='LCM'?25:43, 32]; }
     }
   }
+  // keep players from stacking on top of each other (the ball carrier and the keeper stay put, the others make room)
+  const keep = m && m.mode==='attack' ? m.holder : null;
+  for(let it=0; it<10; it++){ let moved = false;
+    for(let i=0;i<POS.length;i++) for(let j=i+1;j<POS.length;j++){
+      const A = POS[i], B = POS[j], a = out[A], b = out[B]; let dx = b[0]-a[0], dy = b[1]-a[1], d = Math.hypot(dx,dy);
+      if(d>=7) continue;
+      if(d<.01){ dx = (i%2?1:-1); dy = 0; d = 1; }
+      const wa = (A===keep||A==='GK')?0:1, wb = (B===keep||B==='GK')?0:1, tot = wa+wb; if(!tot) continue;
+      const push = 7-d, ux = dx/d, uy = dy/d;
+      a[0] -= ux*push*wa/tot; a[1] -= uy*push*wa/tot; b[0] += ux*push*wb/tot; b[1] += uy*push*wb/tot; moved = true; }
+    for(const p of POS){ out[p][0] = Math.max(4, Math.min(64, out[p][0])); out[p][1] = Math.max(9, Math.min(101, out[p][1])); }
+    if(!moved) break; }
   return out;
 }
 function fieldLines(h){
@@ -1047,7 +1091,7 @@ function renderMatch(){
   if(m.mode==='attack'){
     choices = m.actions.map((a,i)=>{ const [p1,p2]=probs(a), p=p1*p2, me=P(a.from).s;
       const sub = a.kind==='pass' ? `${esc(tag(a.from))} 패스 ${me.pas} → ${esc(tag(a.to))} 볼 컨트롤 ${P(a.to).s.ctl}${offRisk(a)?` · 오프사이드 위험 ${Math.round(offRisk(a)*100)}%`:''}`
-        : a.kind==='dribble' ? `${esc(tag(a.from))} ${SK[a.stat]} ${me[a.stat]}` : `${esc(tag(a.from))} 슈팅 ${me.sho} · 유효슈팅 ${Math.round(p1*100)}%`;
+        : a.kind==='dribble' ? `${esc(tag(a.from))} ${SK[a.stat]} ${me[a.stat]}${m.dribStreak?` · 연속 드리블 -${m.dribStreak*8}%`:''}` : `${esc(tag(a.from))} 슈팅 ${me.sho} · 유효슈팅 ${Math.round(p1*100)}%`;
       return choiceBtn(i,a.label,sub,p,a.kind==='shot'?'골 확률':risk(p),a.run); }).join('');
   } else if(m.mode==='defend'){
     choices = STAGE[m.stage].opts.map((o,i)=>choiceBtn(i,o.label,`${esc(tag(m.cb))} 수비 ${P(m.cb).s.def} · ${o.note}`,defProb(o,m.cb),o.win==='tactical'?'끊기':'성공')).join('');
@@ -1056,7 +1100,7 @@ function renderMatch(){
   }
   const runs = runsFor();
   const runHtml = runs.length ? `<div class="runs"><span class="runs-lb">동료 움직임</span>${runs.map(k=>`<button class="chip" data-run="${k}" aria-pressed="${m.run===k}">${esc(RUNS[k].label())}</button>`).join('')}</div>` : '';
-  const eyebrow = m.mode==='attack' ? `공격 · ${ZONE_KO[m.zone]} · ${m.holder}${m.run&&m.run!=='stRun'?' · 윙어는 안쪽으로, 풀백은 바깥으로 · 공을 뺏기면 수비 뒷공간이 빔':''}` : m.mode==='defend' ? `수비 · ${STAGE[m.stage].name} · ${m.cb}${m.defMod>0?' · 수비 정비됨 +8%':m.defMod<0?' · 뒷공간 열림 -8%':''}${m.stage==='back'&&m.expose?' · 풀백 자리 비어 있음 -10%':''}` : '골키퍼 · 슈팅 위기';
+  const eyebrow = m.mode==='attack' ? `공격 · ${ZONE_KO[m.zone]} · ${CODE[m.holder]}${m.mood?` · ${m.mood.name} ${m.mood.left}번`:''}${m.run&&m.run!=='stRun'?' · 윙어는 안쪽으로, 풀백은 바깥으로 · 공을 뺏기면 수비 뒷공간이 빔':''}` : m.mode==='defend' ? `수비 · ${STAGE[m.stage].name} · ${CODE[m.cb]}${m.defMod>0?' · 수비 정비됨 +8%':m.defMod<0?' · 뒷공간 열림 -8%':''}${m.cb&&m.cards[m.cb]===1?' · 경고 받음 -5%':''}${m.stage==='back'&&m.expose?` · 수비 균형이 무너짐 -${Math.round(m.expose*100)}%`:''}` : '골키퍼 · 슈팅 위기';
   return head + `
   <div class="mgrid">${matchField()}<div class="mside">
   <div class="pitch" aria-label="공 위치">${ZONES.map(([k,l])=>`<span class="${k===zoneOn?'on':''} ${k===zoneOn&&danger?'danger':''}">${l}</span>`).join('')}</div>

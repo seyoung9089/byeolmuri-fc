@@ -399,6 +399,10 @@ const cost = v => Math.max(1, Math.round(Math.max(1, Math.floor((v-40)/10)+1) * 
 function upgrade(p,k){ const t=P(p), c=cost(t.s[k]); if(save.coins<c) return false; save.coins-=c; t.s[k]++; t.inv+=c; persist(); return true; }
 const cvStep = () => save.cv - CV_PER*(10-save.league);
 const cvCost = () => Math.round(CV_BASE*cOf(save.league)*(1+.25*cvStep()));
+// 구단 가치: 1코인 = 1억 원. 지금까지 투자한 코인의 합계를 보여 줍니다.
+const stepCost = j => Math.round(CV_BASE*cOf(10-Math.floor(j/CV_PER))*(1+.25*(j%CV_PER)));
+const cumValue = k => { let t=0; for(let j=0;j<k;j++) t+=stepCost(j); return t; };
+const won = n => { const jo=Math.floor(n/10000), eok=n%10000; return jo ? `${jo}조${eok?` ${eok.toLocaleString('ko-KR')}억`:''}` : `${eok.toLocaleString('ko-KR')}억`; };
 const cvFull = () => save.cv >= needCV(save.league);
 const promoReady = () => cvFull() && save.cool<=0 && !(save.league===1 && save.champ);
 function investCV(){ if(cvFull()) return false; const c=cvCost(); if(save.coins<c) return false; save.coins-=c; save.cv++; persist(); return true; }
@@ -898,12 +902,12 @@ function nav(){
 function leaguePanel(){
   const L = save.league, need = needCV(L), top = L===1, ready = promoReady(), po = nextOpp(true);
   const line = top && save.champ ? '1부 리그 우승을 달성했습니다! 계속 경기를 즐길 수 있습니다.'
-    : !cvFull() ? `구단 가치를 ${need}까지 채우면 ${top?'우승전':'승격전'}이 열립니다. 구단 화면에서 코인을 투자해 올립니다.`
+    : !cvFull() ? `구단 가치를 ${won(cumValue(need))}까지 올리면 ${top?'우승전':'승격전'}이 열립니다. 구단 화면에서 코인을 투자해 올립니다.`
     : save.cool>0 ? `${top?'우승전':'승격전'} 재도전까지 일반 경기 ${save.cool}판이 남았습니다.`
     : `${top?'우승전':'승격전'}이 열렸습니다! 이기면 ${top?'1부 우승':(L-1)+'부 리그로 승격'}입니다.`;
   return `<section class="panel league">
-    <div class="spread"><span class="eyebrow">${L}부 리그</span><span class="mono muted">구단 가치 ${save.cv} / ${need}</span></div>
-    <div class="bar" role="img" aria-label="구단 가치 ${cvFull()?CV_PER:cvStep()} / ${CV_PER}"><i style="width:${Math.min(100,Math.round(100*cvStep()/CV_PER))}%"></i></div>
+    <div class="spread"><span class="eyebrow">${L}부 리그</span><span class="mono muted">구단 가치 ${won(cumValue(save.cv))} / ${won(cumValue(need))}</span></div>
+    <div class="bar" role="img" aria-label="구단 가치 ${won(cumValue(save.cv))} / ${won(cumValue(need))}"><i style="width:${Math.min(100,Math.round(100*cvStep()/CV_PER))}%"></i></div>
     <span style="font-size:14px">${line}</span>
     <div class="row">${ready?`<button class="btn" data-act="start-promo">${top?'우승전':'승격전'} · ${esc(po.name)} (능력치 ${po.ovr})</button>`:''}<button class="btn ghost" data-go="club">구단 투자·아이템</button></div>
   </section>`;
@@ -952,20 +956,20 @@ function renderHome(){
 function renderClub(){
   const L = save.league, tierNow = 10-L, full = cvFull(), top = L===1;
   const invest = full ? `<span class="muted" style="font-size:13px">${top&&save.champ?'1부 우승까지 마쳤습니다. 남은 코인으로 아이템을 구매해 보세요.':`구단 가치가 가득 찼습니다. 홈에서 ${top?'우승전':'승격전'}에 도전하세요.`}</span>`
-    : `<button class="btn" data-act="invest" ${save.coins<cvCost()?'disabled':''}>구단에 투자 · ${cvCost()}코인</button><span class="muted" style="font-size:12px">투자할 때마다 구단 가치가 1 오르고 다음 투자 비용이 25%씩 커집니다.</span>`;
+    : `<button class="btn" data-act="invest" ${save.coins<cvCost()?'disabled':''}>구단에 투자 · ${cvCost()}코인 (구단 가치 +${won(cvCost())})</button><span class="muted" style="font-size:12px">1코인을 투자하면 구단 가치가 1억 원 오릅니다. 투자할 때마다 다음 투자 비용이 25%씩 커집니다.</span>`;
   const shown = ITEMS.filter(it=>it.tier<=tierNow+1);
   const tiers = [...new Set(shown.map(it=>it.tier))];
   return nav() + `
   <header style="display:flex;flex-direction:column;gap:6px"><h1>구단</h1>
     <span class="muted" style="font-size:13px">구단 가치를 올리면 새 아이템이 열립니다. 아이템은 한 번 사면 선수들의 능력치를 한꺼번에 올려 줍니다. 일반 육성보다 효율이 좋습니다.</span></header>
   <section class="panel league">
-    <div class="spread"><span class="eyebrow">${L}부 리그</span><span class="mono muted">구단 가치 ${save.cv} / ${needCV(L)}</span></div>
+    <div class="spread"><span class="eyebrow">${L}부 리그</span><span class="mono muted">구단 가치 ${won(cumValue(save.cv))} / ${won(cumValue(needCV(L)))}</span></div>
     <div class="bar"><i style="width:${Math.min(100,Math.round(100*cvStep()/CV_PER))}%"></i></div>${invest}
     ${discCount()?`<span class="muted" style="font-size:12px">육성비 할인 적용 중: -${Math.min(50,discCount()*10)}%</span>`:''}
   </section>` + tiers.map(t=>`<section class="items"><span class="eyebrow">${10-t}부 리그 아이템</span>${shown.filter(it=>it.tier===t).map(it=>{
       const own = !!save.items[it.id], lock = save.cv<it.unlock;
       return `<article class="itm ${own?'own':''} ${lock?'lock':''}"><div><b>${esc(it.name)}</b><span class="muted">${esc(it.desc)}</span></div>
-        ${own?'<span class="tagown">구매 완료</span>':lock?`<span class="muted" style="font-size:12px">구단 가치 ${it.unlock} 필요</span>`
+        ${own?'<span class="tagown">구매 완료</span>':lock?`<span class="muted" style="font-size:12px">구단 가치 ${won(cumValue(it.unlock))} 필요</span>`
         :`<button class="btn ghost small" data-item="${it.id}" ${save.coins<it.cost?'disabled':''}>${it.cost}코인</button>`}</article>`; }).join('')}</section>`).join('');
 }
 function formPicker(){
